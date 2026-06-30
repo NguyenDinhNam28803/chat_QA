@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI } from '@langchain/openai';
 import { buildQaMessages } from './qa.prompt';
 
+const STREAM_TIMEOUT_MS = 30_000;
+
 @Injectable()
 export class LlmService {
-  private readonly model: ChatOpenAI;
+  private readonly logger = new Logger(LlmService.name);
+  private readonly models: { name: string; model: ChatOpenAI }[];
 
   constructor(config: ConfigService) {
     const base = {
@@ -22,30 +25,59 @@ export class LlmService {
       },
       temperature: 0.2,
       streaming: true,
-      // Free models on OpenRouter get 429-rate-limited upstream often; fail fast
-      // so withFallbacks() actually switches to the fallback instead of hanging
-      // on LangChain's default exponential-backoff retries.
-      maxRetries: 1,
+      // Free OpenRouter models 429 often; fail fast and we fall over manually.
+      maxRetries: 0,
     };
-    const primary = new ChatOpenAI({
-      ...base,
-      model: config.getOrThrow('LLM_PRIMARY_MODEL'),
-    });
-    const fallback = new ChatOpenAI({
-      ...base,
-      model: config.getOrThrow('LLM_FALLBACK_MODEL'),
-    });
-    this.model = primary.withFallbacks([fallback]) as unknown as ChatOpenAI;
+    const primary = config.getOrThrow<string>('LLM_PRIMARY_MODEL');
+    const fallback = config.getOrThrow<string>('LLM_FALLBACK_MODEL');
+    this.models = [
+      { name: primary, model: new ChatOpenAI({ ...base, model: primary }) },
+      { name: fallback, model: new ChatOpenAI({ ...base, model: fallback }) },
+    ];
   }
 
+  /**
+   * Stream the answer, trying each model in order. We do the fallback manually
+   * (instead of LangChain's withFallbacks) because withFallbacks + streaming
+   * intermittently hangs when the primary returns 429: the stream is opened but
+   * never errors cleanly. Here each attempt is wrapped in an abortable timeout,
+   * and we only fall over if NO token has been emitted yet (can't safely restart
+   * a half-streamed answer).
+   */
   async *streamAnswer(
     question: string,
     context: string,
   ): AsyncIterable<string> {
-    const stream = await this.model.stream(buildQaMessages(question, context));
-    for await (const chunk of stream) {
-      const text = typeof chunk.content === 'string' ? chunk.content : '';
-      if (text) yield text;
+    const messages = buildQaMessages(question, context);
+    let lastErr: unknown;
+
+    for (const { name, model } of this.models) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+      let yielded = 0;
+      try {
+        const stream = await model.stream(messages, {
+          signal: controller.signal,
+        });
+        for await (const chunk of stream) {
+          const text = typeof chunk.content === 'string' ? chunk.content : '';
+          if (text) {
+            yielded++;
+            yield text;
+          }
+        }
+        return; // success
+      } catch (err) {
+        lastErr = err;
+        this.logger.warn(`model ${name} failed: ${String(err)}`);
+        // If we already streamed part of an answer, we cannot safely restart on
+        // another model — surface the error instead of duplicating output.
+        if (yielded > 0) throw err;
+        // otherwise: loop to the next model
+      } finally {
+        clearTimeout(timer);
+      }
     }
+    throw lastErr ?? new Error('All LLM models failed');
   }
 }

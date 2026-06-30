@@ -13,6 +13,23 @@ export class ChatService {
     private readonly llm: LlmService,
   ) {}
 
+  /** List conversations for the history sidebar, newest first. */
+  listConversations() {
+    return this.prisma.conversation.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, title: true, createdAt: true },
+    });
+  }
+
+  /** All messages of one conversation, in chronological order. */
+  getMessages(conversationId: string) {
+    return this.prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      select: { role: true, content: true, citations: true },
+    });
+  }
+
   stream(question: string, conversationId?: string): Observable<MessageEvent> {
     return new Observable<MessageEvent>((sub) => {
       (async () => {

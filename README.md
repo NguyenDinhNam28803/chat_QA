@@ -11,6 +11,7 @@
 - [Đây là gì? (RAG, không phải train model)](#-đây-là-gì-rag-không-phải-train-model)
 - [Tính năng](#-tính-năng)
 - [Kiến trúc](#-kiến-trúc)
+- [Lĩnh vực dữ liệu & luồng xử lý chi tiết (file + hàm)](#-lĩnh-vực-dữ-liệu--luồng-xử-lý-chi-tiết-file--hàm)
 - [Tech stack](#-tech-stack)
 - [Bắt đầu nhanh](#-bắt-đầu-nhanh)
 - [Cấu hình (.env)](#-cấu-hình-env)
@@ -89,6 +90,130 @@ flowchart LR
 ```
 
 **Điểm mấu chốt:** chat và ingestion dùng **2 Ollama riêng** (cùng model `bge-m3` → vector 1024) nên nạp tin nền không "bỏ đói" việc embed câu hỏi của chat.
+
+---
+
+## 🔬 Lĩnh vực dữ liệu & luồng xử lý chi tiết (file + hàm)
+
+### Lĩnh vực RAG đang phủ
+Nguồn là 3 RSS "tin mới nhất" (VnExpress, Tuổi Trẻ, Thanh Niên) → **tin tức tổng hợp**, không chuyên một ngành. Phân bố thô (theo từ khóa tiêu đề, có chồng lấn):
+
+| Lĩnh vực | Số bài (≈) | | Lĩnh vực | Số bài (≈) |
+|---|---|---|---|---|
+| Pháp luật & xã hội | 94 | | Thế giới | 39 |
+| Công nghệ & xe | 80 | | Giáo dục | 26 |
+| Thể thao | 73 | | Giải trí | 21 |
+| Kinh tế | 48 | | Sức khỏe | 17 |
+
+> Muốn RAG "chuyên" một lĩnh vực (vd chỉ kinh tế) → đổi `DEFAULT_FEEDS` trong [`feeds.config.ts`](server/src/ingestion/feeds.config.ts) sang RSS chuyên mục tương ứng.
+
+### PHA NẠP — dữ liệu tin tức đi qua file/hàm nào
+
+```mermaid
+flowchart TD
+    A["⏱️ Cron 30' / POST /ingestion/run<br/><i>ingestion.scheduler.ts · onModuleInit()</i><br/><i>ingestion.controller.ts · run()</i>"]
+    A --> B["📥 BullMQ queue (Redis)"]
+    B --> C["👷 Worker nhận job<br/><i>ingestion.processor.ts · process()</i>"]
+    C --> D["📰 Tải + parse RSS → RawFeedItem[]<br/><i>rss.service.ts · fetchFeed()</i>"]
+    D --> E["🔁 Lặp từng bài + điều phối<br/><i>ingestion.service.ts · ingestFeed()/ingestArticle()</i>"]
+    E --> F{"Trùng URL?<br/><i>prisma.article.findUnique</i>"}
+    F -- "có" --> X["⏭️ skip"]
+    F -- "không" --> G["🧹 Bóc text sạch từ HTML<br/><i>content-extractor.service.ts · extract()</i>"]
+    G --> H{"Trùng contentHash (SHA-256)?"}
+    H -- "có" --> X
+    H -- "không" --> I["✂️ Cắt đoạn ~400 token<br/><i>chunk.service.ts · chunk()</i>"]
+    I --> J["🧠 Embed → vector[1024]<br/><i>embedding.service.ts · embedBatch()</i><br/>→ Ollama ingest :11435"]
+    J --> K["💾 Ghi trong $transaction<br/><i>ingestion.service.ts</i><br/>Article (Prisma) + Chunk (raw ::vector)"]
+    K --> DB[("🗄️ Postgres + pgvector<br/>Article · Chunk")]
+```
+
+### PHA HỎI — câu hỏi đi qua file/hàm nào
+
+```mermaid
+flowchart TD
+    U["🖥️ Gõ câu hỏi → mở EventSource<br/><i>web: app/page.tsx → lib/useChatStream.ts · send()</i>"]
+    U -- "GET /chat/stream?q=&conversationId=" --> CT["🚪 Endpoint SSE<br/><i>chat.controller.ts · @Sse stream()</i>"]
+    CT --> CS["🎯 Điều phối<br/><i>chat.service.ts · stream()</i>"]
+    CS --> R["🔎 Truy hồi<br/><i>retrieval.service.ts · search()</i>"]
+    R --> EMB["🧠 Embed câu hỏi → vector[1024]<br/><i>embedding.service.ts · embed()</i><br/>→ Ollama chat :11434"]
+    EMB --> VS["📐 Vector search cosine &lt;=&gt; LIMIT 5<br/><i>retrieval.service.ts · $queryRaw</i>"]
+    VS --> DB[("🗄️ Postgres pgvector<br/>Chunk JOIN Article")]
+    DB --> BC["🔢 Đánh số [1..n] + gom citations<br/><i>context.builder.ts · buildContext()</i>"]
+    BC --> SAVE1["💾 Lưu Message(user)<br/><i>chat.service.ts</i>"]
+    SAVE1 --> LLM["🤖 Stream câu trả lời<br/><i>llm.service.ts · streamAnswer()</i><br/>prompt: <i>qa.prompt.ts · buildQaMessages()</i><br/>→ OpenRouter"]
+    LLM -- "từng token" --> CS
+    CS -- "SSE data:{token}" --> U
+    LLM --> SAVE2["💾 Lưu Message(assistant)+citations → emit done<br/><i>chat.service.ts</i>"]
+    SAVE2 --> DB
+```
+
+### Bảng tra: bước → file → hàm
+
+| # | Bước | File | Hàm | Dịch vụ (cổng) |
+|---|---|---|---|---|
+| **Nạp** | | | | |
+| N1 | Lên lịch / trigger | [`ingestion.scheduler.ts`](server/src/ingestion/ingestion.scheduler.ts) · [`ingestion.controller.ts`](server/src/ingestion/ingestion.controller.ts) | `onModuleInit()` · `run()` | Redis/BullMQ :6380 |
+| N2 | Worker chạy job | [`ingestion.processor.ts`](server/src/ingestion/ingestion.processor.ts) | `process()` | Redis/BullMQ :6380 |
+| N3 | Tải + parse RSS | [`rss.service.ts`](server/src/ingestion/rss.service.ts) | `fetchFeed()` | RSS ngoài (HTTP) |
+| N4 | Điều phối + chống trùng | [`ingestion.service.ts`](server/src/ingestion/ingestion.service.ts) | `ingestFeed()` · `ingestArticle()` | Postgres :55432 |
+| N5 | Bóc text sạch | [`content-extractor.service.ts`](server/src/ingestion/content-extractor.service.ts) | `extract()` | Trang báo (HTTP) |
+| N6 | Cắt đoạn | [`chunk.service.ts`](server/src/ingestion/chunk.service.ts) | `chunk()` | — (thuần CPU) |
+| N7 | Embed → vector[1024] | [`embedding.service.ts`](server/src/embedding/embedding.service.ts) | `embedBatch()` | **Ollama ingest :11435** |
+| N8 | Ghi DB (raw `::vector`) | [`ingestion.service.ts`](server/src/ingestion/ingestion.service.ts) | `$transaction` | Postgres :55432 |
+| **Hỏi** | | | | |
+| H1 | UI gửi + nhận stream | [`page.tsx`](web/src/app/page.tsx) · [`useChatStream.ts`](web/src/lib/useChatStream.ts) | `send()` | Backend SSE :3000 |
+| H2 | Endpoint SSE | [`chat.controller.ts`](server/src/chat/chat.controller.ts) | `stream()` (`@Sse`) | — |
+| H3 | Điều phối + lưu hội thoại | [`chat.service.ts`](server/src/chat/chat.service.ts) | `stream()` | Postgres :55432 |
+| H4 | Embed câu hỏi | [`embedding.service.ts`](server/src/embedding/embedding.service.ts) | `embed()` | **Ollama chat :11434** |
+| H5 | Vector search `<=>` | [`retrieval.service.ts`](server/src/retrieval/retrieval.service.ts) | `search()` (`$queryRaw`) | Postgres :55432 |
+| H6 | Dựng context + citations | [`context.builder.ts`](server/src/retrieval/context.builder.ts) | `buildContext()` | — (thuần) |
+| H7 | Prompt grounding | [`qa.prompt.ts`](server/src/llm/qa.prompt.ts) | `buildQaMessages()` | — (thuần) |
+| H8 | Stream LLM + fallback | [`llm.service.ts`](server/src/llm/llm.service.ts) | `streamAnswer()` | **OpenRouter (cloud)** |
+| H9 | Lịch sử chat | [`chat.service.ts`](server/src/chat/chat.service.ts) | `listConversations()` · `getMessages()` | Postgres :55432 |
+
+### Sơ đồ quan hệ dữ liệu (ERD)
+
+```mermaid
+erDiagram
+    Article ||--o{ Chunk : "1 bài có nhiều đoạn (cascade)"
+    Conversation ||--o{ Message : "1 hội thoại có nhiều tin nhắn (cascade)"
+
+    Article {
+        string id PK "cuid"
+        string url UK "chống trùng"
+        string title
+        string source "tên feed"
+        string author "nullable"
+        datetime publishedAt "nullable, @@index"
+        string content "full text"
+        string contentHash UK "sha256 chống trùng"
+        datetime createdAt
+    }
+    Chunk {
+        string id PK "cuid2 (raw insert)"
+        string articleId FK "→ Article, @@index"
+        int ord "thứ tự đoạn"
+        string content "nội dung đoạn"
+        int tokenCount
+        vector embedding "vector(1024), pgvector"
+        datetime createdAt
+    }
+    Conversation {
+        string id PK "cuid"
+        string title "nullable (80 ký tự đầu câu hỏi)"
+        datetime createdAt
+    }
+    Message {
+        string id PK "cuid"
+        string conversationId FK "→ Conversation, @@index"
+        string role "user | assistant"
+        string content
+        json citations "nullable (Citation[])"
+        datetime createdAt
+    }
+```
+
+> **Quan hệ:** `Article 1—* Chunk` và `Conversation 1—* Message`, đều `onDelete: Cascade` (xóa cha → xóa con). `Chunk` có ràng buộc duy nhất `(articleId, ord)`. Cột `embedding` là kiểu pgvector — Prisma không ghi trực tiếp được, phải dùng raw SQL `::vector` (xem N8).
 
 ---
 

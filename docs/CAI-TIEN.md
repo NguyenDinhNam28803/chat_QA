@@ -91,10 +91,28 @@ Sau CT-1, công tắc này không còn cần thiết để chat mượt, nhưng 
 
 **Giải pháp:**
 - Model hiện dùng: primary `openai/gpt-oss-120b:free`, fallback `openai/gpt-oss-20b:free`.
-- `server/src/llm/llm.service.ts`: thêm `maxRetries:1` để khi model bị 429 thì rớt sang fallback nhanh thay vì treo trên backoff.
+- `server/src/llm/llm.service.ts`: **thay `withFallbacks` bằng fallback THỦ CÔNG**. Lý do: `withFallbacks` + streaming **chập chờn treo** khi primary 429 (stream mở nhưng không lỗi sạch). Bản thủ công: thử từng model theo thứ tự, mỗi lần bọc `AbortController` timeout 30s, chỉ chuyển model khi **chưa phát token nào** (không thể restart giữa chừng). `maxRetries:0` để fail nhanh.
 - Quy trình kiểm tra slug còn sống: `curl https://openrouter.ai/api/v1/models`, hoặc thử `POST /chat/completions` từng model.
 
-**Lưu ý:** độ trễ chat 6-18s còn lại chủ yếu do free-tier OpenRouter, không phải lỗi hệ thống. Muốn nhanh/ổn định hơn → key trả phí.
+**Bằng chứng:** trước khi sửa chat treo 41s ngẫu nhiên; sau khi sửa, smoke test 2 lần đều `DONE:true` (5-15s).
+
+**Lưu ý:** độ trễ chat còn lại chủ yếu do free-tier OpenRouter (primary hay 429 → rớt fallback). Muốn nhanh/ổn định hơn → key trả phí (xem giải thích model trong chat trước đó).
+
+---
+
+## CT-8 · Lịch sử chat (sidebar) — 2026-06-30
+
+**Vấn đề:** backend đã lưu Conversation + Message nhưng UI chỉ giữ chat trong RAM phiên hiện tại — reload là mất, không xem lại được hội thoại cũ.
+
+**Giải pháp:** sidebar liệt kê hội thoại + mở lại toàn bộ tin nhắn (kèm nguồn) + hỏi tiếp trong hội thoại đó. AI vẫn trả lời độc lập từng câu (không đổi LLM).
+
+**File thay đổi:**
+- `server/src/chat/chat.service.ts`: thêm `listConversations()` + `getMessages(id)` (Prisma query thuần).
+- `server/src/chat/chat.controller.ts`: `GET /chat/conversations` + `GET /chat/conversations/:id/messages`.
+- `web/src/lib/useChatStream.ts`: thêm state `conversationId` + `conversations`, hàm `loadConversation`, `newConversation`, `refreshList`; gửi kèm `conversationId` → append đúng hội thoại; bắt `conversationId` từ event `done` của hội thoại mới rồi refresh sidebar.
+- `web/src/app/page.tsx`: layout 2 cột — sidebar (danh sách + nút "Cuộc trò chuyện mới", thu gọn trên mobile) + khung chat.
+
+**Bằng chứng:** `/chat/conversations` trả 31 hội thoại; mở lại hiện đủ user+assistant+nguồn; hỏi tiếp với conversationId → message 2→4, không tạo hội thoại mới; CORS cho :3001 OK.
 
 ---
 
