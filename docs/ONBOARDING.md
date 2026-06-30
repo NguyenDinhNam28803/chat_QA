@@ -26,8 +26,8 @@ Chi tiết luồng nghiệp vụ: xem [§7 Luồng nghiệp vụ](#7-luồng-ngh
 | ORM / DB | Prisma 6 (KHÔNG nâng lên 7) + Postgres 16 + pgvector |
 | Hàng đợi | BullMQ + ioredis + Redis 7 |
 | Ingest | rss-parser, @mozilla/readability + jsdom, cheerio, gpt-tokenizer, @paralleldrive/cuid2 |
-| Embedding | Ollama `bge-m3` → vector **1024 chiều** (KHOÁ trong schema) |
-| LLM | `@langchain/openai` → OpenRouter (model `:free`) |
+| Embedding | Ollama `bge-m3` → vector **1024 chiều** (KHOÁ trong schema) · **2 instance**: chat (11434) + ingestion (11435) |
+| LLM | `@langchain/openai` → OpenRouter (`gpt-oss-120b:free` + fallback `gpt-oss-20b:free`) |
 | Frontend | Next.js 16 (App Router) + Tailwind |
 
 ---
@@ -35,7 +35,7 @@ Chi tiết luồng nghiệp vụ: xem [§7 Luồng nghiệp vụ](#7-luồng-ngh
 ## 3. Yêu cầu môi trường
 
 - **Node.js** (đã test trên v24), npm
-- **Docker Desktop** (chạy Postgres, Redis, Ollama)
+- **Docker Desktop** (chạy Postgres, Redis, **2 Ollama**) — cần ~3GB RAM trống cho 2 model bge-m3
 - **OpenRouter API key** — lấy free tại https://openrouter.ai/keys (chỉ cần cho chat, không cần cho ingest)
 
 ---
@@ -45,10 +45,11 @@ Chi tiết luồng nghiệp vụ: xem [§7 Luồng nghiệp vụ](#7-luồng-ngh
 ```bash
 # 1. Khởi động hạ tầng (từ thư mục gốc d:\Chatbot_QA)
 docker compose up -d
-#    -> Postgres (host 55432), Redis (host 6380), Ollama (11434)
+#    -> Postgres (55432), Redis (6380), Ollama chat (11434), Ollama ingest (11435)
 
-# 2. Kéo model embedding (chỉ 1 lần)
-docker exec newsqa-ollama ollama pull bge-m3
+# 2. Kéo model embedding vào CẢ HAI Ollama (chỉ 1 lần)
+docker exec newsqa-ollama ollama pull bge-m3          # cho chat/retrieval
+docker exec newsqa-ollama-ingest ollama pull bge-m3   # cho ingestion
 
 # 3. Backend
 cd server
@@ -78,14 +79,14 @@ node node_modules/next/dist/bin/next dev -p 3001         # chạy UI :3001
 
 ```
 d:\Chatbot_QA\
-├─ docker-compose.yml        # Postgres+pgvector, Redis, Ollama
-├─ docs/                     # kế hoạch + tài liệu này
+├─ docker-compose.yml        # Postgres+pgvector, Redis, Ollama x2 (chat 11434 + ingest 11435)
+├─ docs/                     # kế hoạch + tài liệu (ONBOARDING, BUSINESS-FLOW, CAI-TIEN)
 ├─ server/                   # Backend NestJS
-│  ├─ .env                   # config (DATABASE_URL, REDIS_PORT, OPENROUTER_*, EMBEDDING_*)
+│  ├─ .env                   # config (DATABASE_URL, REDIS_PORT, OPENROUTER_*, EMBEDDING_*, INGEST_ON_BOOT)
 │  ├─ prisma/schema.prisma   # Article, Chunk(vector 1024), Conversation, Message
 │  └─ src/
 │     ├─ prisma/             # PrismaModule/Service (global)
-│     ├─ embedding/          # bge-m3 qua Ollama; hard-fail nếu sai 1024 chiều
+│     ├─ embedding/          # bge-m3 qua Ollama; 2 instance (chat 11434 / EMBEDDING_INGEST 11435); hard-fail nếu sai 1024
 │     ├─ ingestion/          # PHA NẠP: rss, content-extractor, chunk, ingestion,
 │     │                      #          processor(BullMQ), scheduler(cron), controller
 │     ├─ retrieval/          # PHA TRUY HỒI: context.builder + retrieval.service ($queryRaw <=>)
@@ -117,11 +118,11 @@ d:\Chatbot_QA\
 > 📖 Phiên bản **chi tiết kèm code xử lý từng bước**: [BUSINESS-FLOW.md](BUSINESS-FLOW.md).
 
 ### PHA A — Nạp dữ liệu (nền, cron 30')
-RSS (`rss.service`) → chống trùng URL → bóc text (`content-extractor`: Readability→cheerio) → chống trùng SHA-256 → cắt đoạn ~400 token/overlap 50 (`chunk.service`) → embed bge-m3 (`embedding.service`) → lưu `Article`+`Chunk` raw `::vector` (`ingestion.service`).
+RSS (`rss.service`) → chống trùng URL → bóc text (`content-extractor`: Readability→cheerio) → chống trùng SHA-256 → cắt đoạn ~400 token/overlap 50 (`chunk.service`) → embed bge-m3 qua **Ollama ingest (11435)** → lưu `Article`+`Chunk` raw `::vector` (`ingestion.service`).
 
 ### PHA B — Hỏi-đáp (real-time)
 1. UI mở `EventSource` → `GET /chat/stream?q=...`
-2. `ChatService` embed câu hỏi (Ollama bge-m3)
+2. `RetrievalService` embed câu hỏi qua **Ollama chat (11434)** — tách khỏi ingestion nên không bị chiếm
 3. `RetrievalService` → `$queryRaw ... ORDER BY embedding <=> $vec LIMIT 5`
 4. `buildContext` đánh số `[1..n]` + gom citations
 5. Lưu Message(user) → gọi OpenRouter với prompt grounding nghiêm
@@ -163,7 +164,9 @@ docker exec newsqa-postgres psql -U newsqa -d newsqa -c 'SELECT DISTINCT vector_
 | BullMQ: `Redis version needs >= 5.0.0 Current: 3.0.504` | Một Redis native 3.0.504 (Windows service) chiếm cổng 6379, che container Docker | Docker redis map ra **host 6380**; `REDIS_PORT=6380` trong `.env`. KHÔNG đụng service native. |
 | Chat trả `429 Provider returned error` | Model `:free` của OpenRouter bị **rate-limit upstream** (xoay vòng theo provider) | Probe slug còn sống: `POST /chat/completions` thử model. Đổi `LLM_PRIMARY_MODEL`/`FALLBACK` trong `.env`. Đã set `maxRetries:1` để rớt sang fallback nhanh. |
 | Slug model biến mất (vd `deepseek-chat-v3:free`) | OpenRouter gỡ model free | Liệt kê model sống: `curl https://openrouter.ai/api/v1/models`. Cập nhật slug trong `.env`. |
-| `/chat/stream` treo 50s rồi timeout | `RetrievalService` embed câu hỏi qua Ollama, nhưng **ingestion worker đang chiếm Ollama** | Chờ ingestion lắng (article count ổn định) rồi mới hỏi. Ollama xử lý tuần tự. |
+| `/chat/stream` treo rồi timeout | `RetrievalService` embed câu hỏi qua Ollama, nhưng **ingestion chiếm chung Ollama** | **ĐÃ SỬA bằng 2 Ollama** (chat 11434 / ingest 11435) — xem [CAI-TIEN.md CT-1](CAI-TIEN.md). Tạm thời: `INGEST_ON_BOOT=false`. |
+| Backend tự sập **exit 1** khi ingest | `fetch()` tới trang báo → **undici** ném `AssertionError: assert(!this.paused)` bất đồng bộ, ngoài `try/catch` → uncaught exception | Lưới `process.on('uncaughtException')` trong `main.ts` + `AbortController` timeout. Xem [CT-2](CAI-TIEN.md). |
+| NestJS **crash boot** sau khi thêm param constructor | Nest cố inject provider kiểu `String` cho param `baseUrlOverride?: string` | Đánh dấu `@Optional()` cho param đó. Xem [CT-1](CAI-TIEN.md). |
 | Build TS lỗi `Could not find declaration for 'jsdom'` | Thiếu types | `npm install -D @types/jsdom` |
 | Prisma lỗi gán `citations` (Citation[]) vào cột Json | Json field cần `InputJsonValue` | Cast `citations as unknown as Prisma.InputJsonValue` |
 
@@ -177,6 +180,7 @@ docker exec newsqa-postgres psql -U newsqa -d newsqa -c 'SELECT DISTINCT vector_
 
 ## 11. Trạng thái hiện tại & việc tiếp theo
 
-- **7/7 phase DONE**, RAG loop chạy thật end-to-end. Đạt mốc "Core".
-- **Tầng "Advanced" (tùy chọn):** hybrid search (kết hợp full-text `tsvector` + vector), rerank, lọc theo `publishedAt`, tạo index **HNSW** khi data lớn, kiểm thử fallback model.
-- Kế hoạch gốc: [docs/plans/2026-06-27-newsqa-master-plan.md](plans/2026-06-27-newsqa-master-plan.md), [Phase 3 chi tiết](plans/2026-06-27-phase3-ingestion.md).
+- **7/7 phase DONE** + nhiều cải tiến sau đó (2 Ollama, sửa crash undici, UI mới...). RAG loop chạy thật end-to-end, vừa nạp vừa chat mượt.
+- 📋 **Toàn bộ thay đổi sau 7 phase:** xem [CAI-TIEN.md](CAI-TIEN.md) (changelog có vấn đề → giải pháp → bằng chứng).
+- **Tầng "Advanced" (tùy chọn, chưa làm):** hybrid search (full-text `tsvector` + vector), rerank, lọc theo `publishedAt`, index **HNSW** khi data lớn.
+- Kế hoạch gốc: [master plan](plans/2026-06-27-newsqa-master-plan.md), [Phase 3 chi tiết](plans/2026-06-27-phase3-ingestion.md). Luồng chi tiết: [BUSINESS-FLOW.md](BUSINESS-FLOW.md).
