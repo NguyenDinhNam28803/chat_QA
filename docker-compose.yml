@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: newsqa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: newsqa
+      POSTGRES_PASSWORD: newsqa
+      POSTGRES_DB: newsqa
+    ports:
+      # Host 55432 -> container 5432 to avoid clashing with native Postgres (5432/5433 taken)
+      - "55432:5432"
+    volumes:
+      - newsqa-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsqa -d newsqa"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: newsqa-redis
+    restart: unless-stopped
+    ports:
+      # Host 6380 -> container 6379 to avoid clashing with a native Windows
+      # Redis 3.0.504 service that holds 6379 (too old for BullMQ, needs >=5).
+      - "6380:6379"
+    volumes:
+      - newsqa-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Embedding host (Phase 2). Separate from OpenRouter on purpose — see plan.
+  # Model bge-m3 must be pulled once: `docker exec newsqa-ollama ollama pull bge-m3`
+  # This instance serves CHAT/RETRIEVAL embeds (latency-sensitive).
+  ollama:
+    image: ollama/ollama:latest
+    container_name: newsqa-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - newsqa-ollama:/root/.ollama
+
+  # Dedicated Ollama for INGESTION embeds so background nạp does not starve the
+  # chat instance (both run bge-m3 -> vector(1024)). Pull once:
+  # `docker exec newsqa-ollama-ingest ollama pull bge-m3`
+  ollama-ingest:
+    image: ollama/ollama:latest
+    container_name: newsqa-ollama-ingest
+    restart: unless-stopped
+    ports:
+      - "11435:11434"
+    volumes:
+      - newsqa-ollama-ingest:/root/.ollama
+
+volumes:
+  newsqa-pgdata:
+  newsqa-redisdata:
+  newsqa-ollama:
+  newsqa-ollama-ingest:

@@ -1,0 +1,66 @@
+// NewsQA — Phase 1 schema
+// pgvector extension is enabled in the first migration (see migrations/).
+// Embedding dimension is LOCKED to bge-m3 = 1024. Changing the model means
+// changing vector(1024) here AND re-embedding the whole DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Article {
+  id          String    @id @default(cuid())
+  url         String    @unique
+  title       String
+  source      String
+  author      String?
+  publishedAt DateTime?
+  content     String
+  contentHash String    @unique
+  createdAt   DateTime  @default(now())
+
+  chunks Chunk[]
+
+  @@index([publishedAt])
+}
+
+model Chunk {
+  id         String   @id @default(cuid())
+  articleId  String
+  ord        Int
+  content    String
+  tokenCount Int
+  // pgvector column. Prisma has no native vector type — queried via $queryRaw.
+  embedding  Unsupported("vector(1024)")?
+  createdAt  DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, ord])
+  @@index([articleId])
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  title     String?
+  createdAt DateTime @default(now())
+
+  messages Message[]
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  citations      Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
