@@ -128,6 +128,8 @@ export class ArticlesService {
   async stats(): Promise<{
     totalArticles: number;
     totalChunks: number;
+    totalConversations: number;
+    totalMessages: number;
     byTopic: { topic: string; label: string; count: number }[];
     latest: {
       id: string;
@@ -142,6 +144,12 @@ export class ArticlesService {
     const [{ c }] = await this.prisma.$queryRaw<{ c: number }[]>`
       SELECT count(*)::int AS c FROM "Chunk"
     `;
+    const [{ v }] = await this.prisma.$queryRaw<{ v: number }[]>`
+      SELECT count(*)::int AS v FROM "Conversation"
+    `;
+    const [{ m }] = await this.prisma.$queryRaw<{ m: number }[]>`
+      SELECT count(*)::int AS m FROM "Message"
+    `;
     const byTopic = await this.listTopics();
     const latest = await this.prisma.article.findMany({
       orderBy: { publishedAt: 'desc' },
@@ -151,6 +159,8 @@ export class ArticlesService {
     return {
       totalArticles: Number(a),
       totalChunks: Number(c),
+      totalConversations: Number(v),
+      totalMessages: Number(m),
       byTopic,
       latest,
     };

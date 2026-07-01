@@ -116,6 +116,22 @@ Sau CT-1, công tắc này không còn cần thiết để chat mượt, nhưng 
 
 ---
 
+## CT-21 · Sửa chart lượng bài + thêm quả địa cầu (cobe) — 2026-07-01
+
+- **Fix chart "Lượng bài nạp":** bug — cột `<div style height:%>` có phần tử cha (flex-col) KHÔNG có chiều cao xác định → % không tính được → bar collapse. Sửa: bọc bar trong `<div className="relative flex-1">` (flex-1 trong cột `h-52` = chiều cao xác định) rồi bar `absolute bottom-0 h-[pct%]`, `Math.max(pct,3)` để cột nhỏ vẫn thấy; thêm nhãn số (luôn hiện) trên + ngày dưới.
+- **Quả địa cầu:** `components/Globe.tsx` dùng **cobe** (đã cài 2.0.1). Dynamic-import cobe TRONG useEffect (WebGL client-only, né SSR). Marker: Việt Nam + Washington/London/Bắc Kinh/Tokyo/Paris. `onRender` tự xoay. Panel "Phủ sóng tin tức" cạnh chart (grid 3 cột: globe 1 + chart 2). **Màu:** ban đầu `dark:0` + đất xám nhạt trên thẻ TRẮNG → tàng hình; sửa thành **`dark:1` (cầu tối) + chấm sáng 0.92 + marker cam + mapBrightness 5.2** để nổi trên nền trắng lab.
+- **Lưu ý cobe v2:** `COBEOptions` trong .d.ts THIẾU `onRender` (dù README dùng) → cast `opts as unknown as Parameters<typeof createGlobe>[1]`.
+- **Verify:** typecheck+lint 0, local next build OK (cobe bundle), Docker rebuild, /dashboard 200.
+
+## CT-20 · Thiết kế lại Dashboard chuyên nghiệp — 2026-07-01
+
+Cấu trúc lại RIÊNG trang `/dashboard` (giữ hệ Robotics Lab) thành bảng điều khiển phân tích:
+- **KPI 6 ô:** Tổng bài · Bài hôm nay (+delta vs hôm qua) · Đoạn vector · Lĩnh vực · Hội thoại · Tin nhắn. (Thêm `totalConversations`/`totalMessages` vào `stats()`.)
+- **Biểu đồ:** cột "Lượng bài nạp · 14 ngày" (TB/ngày, hover hiện số) · thanh "Phân bố lĩnh vực" (có %, bấm → lọc thư viện) · thanh "Nguồn tin".
+- **Panel + nút "Xem chi tiết →":** mỗi panel có header + link tới trang liên quan (Phân bố→Thư viện, Từ khóa→Dòng thời gian, Nguồn→Xem bài, Tin mới→Xem tất cả). Component `Kpi` + `Panel` tái sử dụng trong file.
+- **Layout:** max-w-6xl, grid 3 cột (chart span 2), responsive. Accent cam dành cho biểu đồ; link chi tiết subtle (hover mới thành cam).
+- **Verify:** BE build+lint+test 14/14; web typecheck+lint 0; Docker rebuild; stats trả usage; /dashboard render 200.
+
 ## CT-19 · 3 trụ tính năng AI (Summary/Brief/Timeline/Compare/Insight) — 2026-07-01
 
 Thêm 5 tính năng AI tận dụng RAG + đa nguồn, **cache LLM để né rate-limit free-tier**.

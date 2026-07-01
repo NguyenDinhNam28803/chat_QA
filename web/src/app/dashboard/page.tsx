@@ -1,14 +1,17 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Nav } from '../../components/Nav';
 import { Skeleton } from '../../components/ui';
+import { Globe } from '../../components/Globe';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 interface Stats {
   totalArticles: number;
   totalChunks: number;
+  totalConversations: number;
+  totalMessages: number;
   byTopic: { topic: string; label: string; count: number }[];
   latest: { id: string; title: string; topic: string | null; publishedAt: string | null }[];
 }
@@ -37,65 +40,133 @@ export default function DashboardPage() {
     })();
   }, []);
 
+  const topicTotal = stats ? stats.byTopic.reduce((s, t) => s + t.count, 0) : 0;
   const maxTopic = stats ? Math.max(...stats.byTopic.map((t) => t.count), 1) : 1;
   const maxDay = ins ? Math.max(...ins.perDay.map((d) => d.c), 1) : 1;
+  const maxSource = ins ? Math.max(...ins.sources.map((s) => s.c), 1) : 1;
+  const today = ins && ins.perDay.length ? ins.perDay[ins.perDay.length - 1].c : 0;
+  const yesterday = ins && ins.perDay.length > 1 ? ins.perDay[ins.perDay.length - 2].c : 0;
+  const avgDay = ins && ins.perDay.length
+    ? Math.round(ins.perDay.reduce((s, d) => s + d.c, 0) / ins.perDay.length)
+    : 0;
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Chat</Link>
           <div className="flex-1" />
           <Nav current="/dashboard" />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl px-4 py-6">
-        <p className="label mb-1">Bảng tin</p>
-        <h1 className="mb-6 font-display text-[2.6rem] font-extrabold leading-none tracking-tight">
-          Thống kê & Insight
-        </h1>
+      <main className="mx-auto w-full max-w-6xl px-4 py-6">
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <p className="label mb-1">Bảng điều khiển</p>
+            <h1 className="font-display text-[2.4rem] font-extrabold leading-none tracking-tight">
+              Tổng quan hệ thống
+            </h1>
+          </div>
+          <p className="label hidden sm:block">
+            Cập nhật {new Date().toLocaleString('vi-VN')}
+          </p>
+        </div>
 
         {!stats ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <Skeleton className="h-28" />
-              <Skeleton className="h-28" />
-              <Skeleton className="h-28" />
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20" />)}
             </div>
-            <Skeleton className="h-64" />
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Skeleton className="h-72 lg:col-span-2" />
+              <Skeleton className="h-72" />
+            </div>
           </div>
         ) : (
-          <div className="space-y-8">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <StatCard label="Bài viết" value={stats.totalArticles} />
-              <StatCard label="Đoạn (vector)" value={stats.totalChunks} />
-              <StatCard label="Lĩnh vực" value={stats.byTopic.length} />
+          <div className="space-y-4">
+            {/* KPI row */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+              <Kpi label="Tổng bài" value={stats.totalArticles} />
+              <Kpi
+                label="Bài hôm nay"
+                value={today}
+                sub={yesterday ? `${today - yesterday >= 0 ? '+' : ''}${today - yesterday} vs hôm qua` : undefined}
+              />
+              <Kpi label="Đoạn vector" value={stats.totalChunks} />
+              <Kpi label="Lĩnh vực" value={stats.byTopic.length} />
+              <Kpi label="Hội thoại" value={stats.totalConversations} />
+              <Kpi label="Tin nhắn" value={stats.totalMessages} />
             </div>
 
-            {/* Insight: ingest volume (accent bars) */}
-            {ins && ins.perDay.length > 0 && (
-              <section className="rounded-lg border border-black/10 bg-surface p-6">
-                <h2 className="label mb-4">Bài nạp · 14 ngày</h2>
-                <div className="flex h-32 items-end gap-1">
-                  {ins.perDay.map((d) => (
-                    <div key={d.d} className="flex flex-1 flex-col items-center gap-1" title={`${d.d}: ${d.c}`}>
-                      <div className="w-full bg-accent" style={{ height: `${(d.c / maxDay) * 100}%` }} />
-                      <span className="label text-[0.6rem]">{d.d}</span>
-                    </div>
+            {/* Globe + ingest chart */}
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Panel title="Phủ sóng tin tức">
+                <Globe />
+                <p className="mt-1 text-center text-xs text-muted">
+                  Nguồn tin trong nước & quốc tế
+                </p>
+              </Panel>
+
+              <Panel
+                className="lg:col-span-2"
+                title="Lượng bài nạp · 14 ngày"
+                right={<span className="label">TB {avgDay}/ngày</span>}
+              >
+                {ins && ins.perDay.length > 0 ? (
+                  <div className="flex h-52 items-stretch gap-2">
+                    {ins.perDay.map((d) => (
+                      <div key={d.d} className="group flex flex-1 flex-col">
+                        <div className="text-center font-mono text-[0.65rem] text-muted">
+                          {d.c}
+                        </div>
+                        <div className="relative flex-1">
+                          <div
+                            className="absolute bottom-0 left-0 w-full bg-accent transition-all group-hover:brightness-95"
+                            style={{ height: `${Math.max((d.c / maxDay) * 100, 3)}%` }}
+                            title={`${d.d}: ${d.c} bài`}
+                          />
+                        </div>
+                        <div className="label mt-1.5 text-center text-[0.6rem]">{d.d}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">Chưa có dữ liệu.</p>
+                )}
+              </Panel>
+            </div>
+
+            {/* Topic + trending + sources */}
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Panel title="Phân bố lĩnh vực" href="/articles" action="Thư viện">
+                <div className="space-y-2">
+                  {stats.byTopic.map((t) => (
+                    <Link
+                      key={t.topic}
+                      href={`/articles?topic=${t.topic}`}
+                      className="group block"
+                    >
+                      <div className="mb-0.5 flex items-baseline justify-between text-sm">
+                        <span className="text-muted group-hover:text-fg">{t.label}</span>
+                        <span className="font-mono text-xs tabular-nums text-muted">
+                          {topicTotal ? Math.round((t.count / topicTotal) * 100) : 0}% · {t.count}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-black/5">
+                        <div className="h-full bg-accent transition-all" style={{ width: `${(t.count / maxTopic) * 100}%` }} />
+                      </div>
+                    </Link>
                   ))}
                 </div>
-              </section>
-            )}
+              </Panel>
 
-            {/* Insight: trending keywords + top sources */}
-            {ins && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <section className="rounded-lg border border-black/10 bg-surface p-6">
-                  <h2 className="label mb-3">Từ khóa nổi · 3 ngày</h2>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ins.trending.length === 0 && <p className="text-sm text-muted">Chưa đủ dữ liệu.</p>}
-                    {ins.trending.map((t) => (
+              <Panel title="Từ khóa nổi · 3 ngày" href="/timeline" action="Dòng thời gian">
+                <div className="flex flex-wrap gap-1.5">
+                  {!ins || ins.trending.length === 0 ? (
+                    <p className="text-sm text-muted">Chưa đủ dữ liệu.</p>
+                  ) : (
+                    ins.trending.map((t) => (
                       <Link
                         key={t.term}
                         href={`/timeline?q=${encodeURIComponent(t.term)}`}
@@ -104,51 +175,43 @@ export default function DashboardPage() {
                       >
                         {t.term}
                       </Link>
-                    ))}
-                  </div>
-                </section>
-                <section className="rounded-lg border border-black/10 bg-surface p-6">
-                  <h2 className="label mb-3">Top nguồn</h2>
-                  <ul className="space-y-1.5">
-                    {ins.sources.map((s) => (
-                      <li key={s.source} className="flex items-center justify-between text-sm">
-                        <span className="text-muted">{s.source}</span>
-                        <span className="font-mono tabular-nums">{s.c}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              </div>
-            )}
+                    ))
+                  )}
+                </div>
+              </Panel>
 
-            {/* Topic distribution */}
-            <section className="rounded-lg border border-black/10 bg-surface p-6">
-              <h2 className="label mb-4">Phân bố theo lĩnh vực</h2>
-              <div className="space-y-2.5">
-                {stats.byTopic.map((t) => (
-                  <Link key={t.topic} href={`/articles?topic=${t.topic}`} className="group flex items-center gap-3">
-                    <span className="w-20 shrink-0 text-sm text-muted group-hover:text-fg">{t.label}</span>
-                    <div className="h-5 flex-1 bg-black/5">
-                      <div className="h-full bg-accent transition-all" style={{ width: `${(t.count / maxTopic) * 100}%` }} />
+              <Panel title="Nguồn tin" href="/articles" action="Xem bài">
+                <div className="space-y-2">
+                  {ins?.sources.map((s) => (
+                    <div key={s.source}>
+                      <div className="mb-0.5 flex items-baseline justify-between text-sm">
+                        <span className="truncate text-muted">{s.source}</span>
+                        <span className="ml-2 font-mono text-xs tabular-nums text-muted">{s.c}</span>
+                      </div>
+                      <div className="h-2 bg-black/5">
+                        <div className="h-full bg-accent" style={{ width: `${(s.c / maxSource) * 100}%` }} />
+                      </div>
                     </div>
-                    <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted">{t.count}</span>
-                  </Link>
-                ))}
-              </div>
-            </section>
+                  ))}
+                </div>
+              </Panel>
+            </div>
 
-            {/* Latest */}
-            <section className="rounded-lg border border-black/10 bg-surface p-6">
-              <h2 className="label mb-3">Tin mới nhất</h2>
-              <ul className="divide-y divide-black/10">
+            {/* Latest — full width */}
+            <Panel title="Tin mới nhất" href="/articles" action="Xem tất cả">
+              <ul className="grid gap-x-8 sm:grid-cols-2">
                 {stats.latest.map((a) => (
-                  <li key={a.id} className="py-2.5">
-                    <Link href={`/articles/${a.id}`} className="font-medium hover:text-accent">{a.title}</Link>
-                    {a.publishedAt && <span className="label ml-2">{new Date(a.publishedAt).toLocaleString('vi-VN')}</span>}
+                  <li key={a.id} className="border-b border-black/10 py-2">
+                    <Link href={`/articles/${a.id}`} className="text-sm font-medium leading-snug hover:text-accent">
+                      {a.title}
+                    </Link>
+                    {a.publishedAt && (
+                      <div className="label mt-0.5">{new Date(a.publishedAt).toLocaleString('vi-VN')}</div>
+                    )}
                   </li>
                 ))}
               </ul>
-            </section>
+            </Panel>
           </div>
         )}
       </main>
@@ -156,13 +219,45 @@ export default function DashboardPage() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function Kpi({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
-    <div className="rounded-lg border border-black/10 bg-surface p-5">
-      <div className="font-display text-[2.4rem] font-black leading-none tracking-tight">
+    <div className="rounded-lg border border-black/10 bg-surface p-4">
+      <div className="font-display text-2xl font-black leading-none tabular-nums">
         {value.toLocaleString('vi-VN')}
       </div>
-      <div className="label mt-2">{label}</div>
+      <div className="label mt-1.5">{label}</div>
+      {sub && <div className="mt-1 font-mono text-[0.65rem] text-muted">{sub}</div>}
     </div>
+  );
+}
+
+function Panel({
+  title,
+  href,
+  action,
+  right,
+  className = '',
+  children,
+}: {
+  title: string;
+  href?: string;
+  action?: string;
+  right?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`rounded-lg border border-black/10 bg-surface p-5 ${className}`}>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="label">{title}</h2>
+        {right}
+        {href && (
+          <Link href={href} className="label text-muted transition hover:text-accent">
+            {action ?? 'Xem chi tiết'} →
+          </Link>
+        )}
+      </div>
+      {children}
+    </section>
   );
 }
