@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ThemeToggle } from '../../components/ThemeToggle';
+import { Skeleton, highlight } from '../../components/ui';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -11,6 +13,7 @@ interface ArticleRow {
   topic: string | null;
   publishedAt: string | null;
   url: string;
+  snippet: string;
 }
 interface TopicInfo {
   topic: string;
@@ -43,6 +46,15 @@ export default function ArticlesPage() {
       }
     })();
   }, []);
+
+  // Live search: debounce the input into the query (350ms).
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setPage(1);
+      setQuery(q.trim());
+    }, 350);
+    return () => clearTimeout(id);
+  }, [q]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag for a data fetch
@@ -77,9 +89,10 @@ export default function ArticlesPage() {
           >
             ← Chat
           </Link>
-          <h1 className="text-[15px] font-semibold tracking-tight">
+          <h1 className="flex-1 text-[15px] font-semibold tracking-tight">
             Thư viện bài · {data?.total ?? 0} bài
           </h1>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -141,31 +154,57 @@ export default function ArticlesPage() {
         </div>
 
         {/* List */}
-        {loading && <p className="text-sm text-slate-400">Đang tải…</p>}
+        {loading && !data && (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <Skeleton className="mb-2 h-3 w-32" />
+                <Skeleton className="mb-2 h-5 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            ))}
+          </div>
+        )}
         {!loading && data?.items.length === 0 && (
           <p className="text-sm text-slate-400">Không có bài nào khớp.</p>
         )}
-        <ul className="space-y-2">
+        <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>
           {data?.items.map((a) => (
             <li
               key={a.id}
-              className="rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/40"
+              className="group rounded-xl border border-slate-200 bg-white p-4 transition hover:border-indigo-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/40"
             >
-              <Link
-                href={`/articles/${a.id}`}
-                className="font-medium text-slate-800 hover:text-indigo-700 dark:text-slate-100 dark:hover:text-indigo-300"
-              >
-                {a.title}
-              </Link>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
                   {labelOf(a.topic)}
                 </span>
-                <span>{a.source}</span>
+                <span className="text-slate-400">{a.source}</span>
                 {a.publishedAt && (
-                  <span>· {new Date(a.publishedAt).toLocaleString('vi-VN')}</span>
+                  <span className="text-slate-400">
+                    · {new Date(a.publishedAt).toLocaleDateString('vi-VN')}
+                  </span>
                 )}
               </div>
+              <Link
+                href={`/articles/${a.id}`}
+                className="block text-[17px] font-semibold leading-snug text-slate-800 transition group-hover:text-indigo-700 dark:text-slate-100 dark:group-hover:text-indigo-300"
+              >
+                {highlight(a.title, query)}
+              </Link>
+              {a.snippet && (
+                <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                  {highlight(a.snippet, query)}…
+                </p>
+              )}
+              <Link
+                href={`/articles/${a.id}`}
+                className="mt-2 inline-block text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                Đọc tiếp →
+              </Link>
             </li>
           ))}
         </ul>

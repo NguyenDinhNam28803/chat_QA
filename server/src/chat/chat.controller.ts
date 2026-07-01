@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Sse } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Sse } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { ChatService } from './chat.service';
 
@@ -25,5 +25,10 @@ export class ChatController {
   @Get('conversations/:id/messages')
   getMessages(@Param('id') id: string) {
     return this.chat.getMessages(id);
+  }
+
+  @Post('messages/:id/feedback')
+  feedback(@Param('id') id: string, @Body() body: { value: number }) {
+    return this.chat.setFeedback(id, Number(body?.value ?? 0));
   }
 }

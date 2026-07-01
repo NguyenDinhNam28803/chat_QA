@@ -60,6 +60,7 @@ model Message {
   role           String
   content        String
   citations      Json?
+  feedback       Int?
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

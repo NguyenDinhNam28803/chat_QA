@@ -26,8 +26,23 @@ export class ChatService {
     return this.prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'asc' },
-      select: { role: true, content: true, citations: true },
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        citations: true,
+        feedback: true,
+      },
     });
+  }
+
+  /** Record 👍 (1) / 👎 (-1) / clear (0→null) feedback on an assistant message. */
+  async setFeedback(id: string, value: number): Promise<{ ok: boolean }> {
+    await this.prisma.message.update({
+      where: { id },
+      data: { feedback: value === 0 ? null : value },
+    });
+    return { ok: true };
   }
 
   stream(
@@ -58,7 +73,7 @@ export class ChatService {
           sub.next({ data: { token } } as MessageEvent);
         }
 
-        await this.prisma.message.create({
+        const assistantMsg = await this.prisma.message.create({
           data: {
             conversationId: convo.id,
             role: 'assistant',
@@ -67,7 +82,12 @@ export class ChatService {
           },
         });
         sub.next({
-          data: { done: true, citations, conversationId: convo.id },
+          data: {
+            done: true,
+            citations,
+            conversationId: convo.id,
+            messageId: assistantMsg.id,
+          },
         } as MessageEvent);
         sub.complete();
       })().catch((err) => sub.error(err));

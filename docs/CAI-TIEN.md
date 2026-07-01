@@ -116,6 +116,32 @@ Sau CT-1, công tắc này không còn cần thiết để chat mượt, nhưng 
 
 ---
 
+## CT-14 · Phase 12 — Web UX & Insight (Nhóm A + B) — 2026-07-01
+
+**Phân tích số liệu** (788 bài, tăng ~310/ngày): chủ đề lệch nặng (Thể thao 34.8% ↔ Thế giới 1%), **14.3% câu trả lời "không tìm thấy"**, 100% có citations, chat 2.7 msg/hội thoại.
+
+**Nhóm A:**
+- **A1 Dashboard** (`/dashboard`): endpoint `/articles/stats` (totals, byTopic, latest) + trang thẻ số liệu + biểu đồ thanh phân bố lĩnh vực (bấm → lọc) + tin mới nhất.
+- **A2 Trạng thái + Dừng:** hook thêm `phase` (retrieving/generating) + `stop()`; UI hiện "🔎 Đang tìm nguồn…/✍️ Đang soạn…" + nút Dừng (đóng EventSource, giữ token đã có).
+- **A3 Fallback "không tìm thấy":** phát hiện câu từ chối → chip "Bỏ lọc lĩnh vực" + "Duyệt thư viện bài".
+- **A4 Skeleton:** khung xương khi tải danh sách/chi tiết bài (`components/ui.tsx`).
+
+**Nhóm B:**
+- **B1 Bài liên quan:** `/articles/:id/related` (cùng chủ đề, mới nhất) + section cuối trang chi tiết.
+- **B2 Feedback 👍/👎:** cột `Message.feedback Int?`; chat emit `messageId` ở event done; `POST /chat/messages/:id/feedback`; nút 👍/👎 trên câu trả lời.
+- **B3 Dark mode toggle:** `@custom-variant dark` (class-based) + script no-FOUC trong layout + `ThemeToggle` (localStorage).
+- **B4 Tìm live + highlight:** debounce 350ms ô tìm; `highlight()` tô vàng từ khóa khớp trong tiêu đề/trích đoạn.
+
+**Verify:** BE build+lint+test 14/14; web lint+typecheck 0; deploy Docker (`--profile app up --build`), endpoints stats/related/feedback + trang dashboard/articles/detail render OK.
+
+## CT-13 · Đổi thương hiệu + nâng hiển thị + deploy Docker — 2026-07-01
+
+- **Thương hiệu:** đổi "NewsQA" → **"Điểm Tin AI"** (logo chữ "Đ") ở layout title, sidebar, avatar AI, footer.
+- **Hiển thị nội dung:**
+  - Danh sách bài (`/articles`): thêm **trích đoạn** (`snippet` = `left(content,240)` từ API), badge chủ đề dạng pill, tiêu đề lớn hơn, nút "Đọc tiếp →".
+  - Chi tiết bài (`/articles/[id]`): **tách đoạn dễ đọc** (content lưu 1 dòng → gom câu thành đoạn ~3 câu), typography lớn (text-[17px] leading-8), **thời gian đọc**, badge chủ đề, nút "Đọc bản gốc".
+- **Deploy Docker (thật):** `docker compose --profile app up -d --build` → backend + frontend chạy trong container (image build từ code mới nhất), nối postgres/redis/2 ollama qua service name. Backend lấy `OPENROUTER_API_KEY` + models từ `server/.env` qua `env_file`, biến mạng do `environment` ghi đè. Verified: `/health` ok, brand đúng, snippet có, chat streaming chạy. **Lưu ý sự cố:** Docker Desktop từng tắt giữa chừng → backend crash `ECONNREFUSED 6380` (redis down); khởi động lại Docker Desktop là phục hồi.
+
 ## CT-12 · Phase 11 — Tính năng sản phẩm — 2026-06-30
 
 **A. Thẻ chủ đề + lọc lĩnh vực:** cột `Article.topic` (backfill 611 bài; Thể thao 216, Sức khỏe 120, Công nghệ 103…). `topic.classifier.ts` (luật từ khóa, 9 nhóm, có test). Gán khi ingest. `retrieval.search(q, k, topic?)` lọc theo topic; truyền qua `/chat/stream?...&topic=`. UI có hàng chip lọc lĩnh vực trên khung chat.

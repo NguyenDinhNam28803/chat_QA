@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface Citation {
   index: number;
@@ -9,9 +9,11 @@ export interface Citation {
 }
 
 export interface ChatMessage {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
   citations?: Citation[];
+  feedback?: number | null;
 }
 
 export interface ConversationSummary {
@@ -26,28 +28,29 @@ export interface TopicInfo {
   count: number;
 }
 
+export type Phase = 'idle' | 'retrieving' | 'generating';
+
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 export function useChatStream() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
+  const [phase, setPhase] = useState<Phase>('idle');
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [topics, setTopics] = useState<TopicInfo[]>([]);
   const [topic, setTopic] = useState<string | undefined>();
+  const esRef = useRef<EventSource | null>(null);
 
   const refreshList = useCallback(async () => {
     try {
       const res = await fetch(`${API}/chat/conversations`);
       if (res.ok) setConversations(await res.json());
     } catch {
-      /* ignore — offline backend */
+      /* ignore */
     }
   }, []);
 
-  // Load conversation list + topic filters once on mount. Legitimate async data
-  // fetches (network → setState), not derived state.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshList();
@@ -61,31 +64,35 @@ export function useChatStream() {
     })();
   }, [refreshList]);
 
-  /** Open a past conversation: load its messages into the view. */
   const loadConversation = useCallback(
     async (id: string) => {
       if (streaming) return;
-      setLoadingHistory(true);
       try {
         const res = await fetch(`${API}/chat/conversations/${id}/messages`);
         if (res.ok) {
-          const rows: ChatMessage[] = await res.json();
-          setMessages(rows);
+          setMessages(await res.json());
           setConversationId(id);
         }
-      } finally {
-        setLoadingHistory(false);
+      } catch {
+        /* ignore */
       }
     },
     [streaming],
   );
 
-  /** Start a fresh conversation. */
   const newConversation = useCallback(() => {
     if (streaming) return;
     setMessages([]);
     setConversationId(undefined);
   }, [streaming]);
+
+  /** Stop an in-flight answer, keeping whatever streamed so far. */
+  const stop = useCallback(() => {
+    esRef.current?.close();
+    esRef.current = null;
+    setStreaming(false);
+    setPhase('idle');
+  }, []);
 
   function send(q: string) {
     const question = q.trim();
@@ -97,15 +104,18 @@ export function useChatStream() {
       { role: 'assistant', content: '' },
     ]);
     setStreaming(true);
+    setPhase('retrieving');
 
     let url = `${API}/chat/stream?q=${encodeURIComponent(question)}`;
     if (conversationId) url += `&conversationId=${conversationId}`;
     if (topic) url += `&topic=${encodeURIComponent(topic)}`;
     const es = new EventSource(url);
+    esRef.current = es;
 
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
       if (data.token) {
+        setPhase('generating');
         setMessages((m) => {
           const copy = [...m];
           const last = copy[copy.length - 1];
@@ -117,22 +127,22 @@ export function useChatStream() {
           const copy = [...m];
           copy[copy.length - 1] = {
             ...copy[copy.length - 1],
+            id: data.messageId as string,
             citations: data.citations as Citation[],
           };
           return copy;
         });
-        // Capture the conversation id (new chats get one here) + refresh sidebar.
         const isNew = !conversationId;
         if (data.conversationId) setConversationId(data.conversationId);
         if (isNew) void refreshList();
         setStreaming(false);
+        setPhase('idle');
         es.close();
+        esRef.current = null;
       }
     };
 
     es.onerror = () => {
-      // Surface the failure instead of leaving an empty bubble (LLM overload,
-      // backend down, network…). Only overwrite if nothing streamed yet.
       setMessages((m) => {
         const copy = [...m];
         const last = copy[copy.length - 1];
@@ -146,20 +156,44 @@ export function useChatStream() {
         return copy;
       });
       setStreaming(false);
+      setPhase('idle');
       es.close();
+      esRef.current = null;
     };
   }
+
+  /** 👍 (1) / 👎 (-1) an assistant message; sending the same value clears it. */
+  const sendFeedback = useCallback((messageId: string, value: number) => {
+    setMessages((m) =>
+      m.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, feedback: msg.feedback === value ? null : value }
+          : msg,
+      ),
+    );
+    const next =
+      messages.find((msg) => msg.id === messageId)?.feedback === value
+        ? 0
+        : value;
+    void fetch(`${API}/chat/messages/${messageId}/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: next }),
+    }).catch(() => {});
+  }, [messages]);
 
   return {
     messages,
     conversations,
     conversationId,
     streaming,
-    loadingHistory,
+    phase,
     topics,
     topic,
     setTopic,
     send,
+    stop,
+    sendFeedback,
     loadConversation,
     newConversation,
   };

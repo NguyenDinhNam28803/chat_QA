@@ -11,6 +11,16 @@ export class ArticlesController {
     return this.articles.listTopics();
   }
 
+  @Get('stats')
+  stats() {
+    return this.articles.stats();
+  }
+
+  @Get(':id/related')
+  related(@Param('id') id: string) {
+    return this.articles.related(id);
+  }
+
   @Get()
   list(
     @Query('q') q?: string,

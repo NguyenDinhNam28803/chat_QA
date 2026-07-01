@@ -42,6 +42,7 @@ export class ArticlesService {
       topic: string | null;
       publishedAt: Date | null;
       url: string;
+      snippet: string;
     }[];
     total: number;
     page: number;
@@ -65,9 +66,11 @@ export class ArticlesService {
         topic: string | null;
         publishedAt: Date | null;
         url: string;
+        snippet: string;
       }[]
     >(Prisma.sql`
-      SELECT "id", "title", "source", "topic", "publishedAt", "url"
+      SELECT "id", "title", "source", "topic", "publishedAt", "url",
+             left("content", 240) AS "snippet"
       FROM "Article"
       ${where}
       ORDER BY "publishedAt" DESC NULLS LAST
@@ -101,6 +104,53 @@ export class ArticlesService {
         publishedAt: true,
         content: true,
       },
+    });
+  }
+
+  /** Dashboard stats: totals, per-topic counts, latest articles. */
+  async stats(): Promise<{
+    totalArticles: number;
+    totalChunks: number;
+    byTopic: { topic: string; label: string; count: number }[];
+    latest: {
+      id: string;
+      title: string;
+      topic: string | null;
+      publishedAt: Date | null;
+    }[];
+  }> {
+    const [{ a }] = await this.prisma.$queryRaw<{ a: number }[]>`
+      SELECT count(*)::int AS a FROM "Article"
+    `;
+    const [{ c }] = await this.prisma.$queryRaw<{ c: number }[]>`
+      SELECT count(*)::int AS c FROM "Chunk"
+    `;
+    const byTopic = await this.listTopics();
+    const latest = await this.prisma.article.findMany({
+      orderBy: { publishedAt: 'desc' },
+      take: 6,
+      select: { id: true, title: true, topic: true, publishedAt: true },
+    });
+    return {
+      totalArticles: Number(a),
+      totalChunks: Number(c),
+      byTopic,
+      latest,
+    };
+  }
+
+  /** Related articles: same topic, most recent, excluding the given one. */
+  async related(id: string) {
+    const article = await this.prisma.article.findUnique({
+      where: { id },
+      select: { topic: true },
+    });
+    if (!article) return [];
+    return this.prisma.article.findMany({
+      where: { topic: article.topic, id: { not: id } },
+      orderBy: { publishedAt: 'desc' },
+      take: 5,
+      select: { id: true, title: true, source: true, publishedAt: true },
     });
   }
 }
