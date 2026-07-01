@@ -3,7 +3,32 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import { useChatStream, type Citation } from '../lib/useChatStream';
-import { ThemeToggle } from '../components/ThemeToggle';
+import { Nav } from '../components/Nav';
+
+// Markdown — flat, Inter body. Links stay fg (accent reserved for the one action).
+const md: Components = {
+  p: ({ children }) => <p className="mb-2 whitespace-pre-wrap last:mb-0">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold text-fg">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-black/30 underline-offset-2 hover:decoration-accent">
+      {children}
+    </a>
+  ),
+  h1: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
+  h2: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
+  h3: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
+  code: ({ children }) => <code className="bg-black/5 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
+};
+
+const EXAMPLES = [
+  'Vietnam Airlines đặt mục tiêu lợi nhuận bao nhiêu năm nay?',
+  'Có tin gì mới về kinh tế Việt Nam?',
+  'Tóm tắt một tin đáng chú ý hôm nay.',
+];
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -14,49 +39,19 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+      className="label hover:text-fg"
       title="Sao chép"
     >
-      {copied ? '✓ Đã chép' : '⧉ Chép'}
+      {copied ? '✓ ĐÃ CHÉP' : '⧉ CHÉP'}
     </button>
   );
 }
 
-/** Suggested follow-up questions derived from an answer's citations (no LLM). */
 function followUps(citations?: Citation[]): string[] {
-  const s = (citations ?? [])
-    .slice(0, 2)
-    .map((c) => `Tóm tắt bài: ${c.title}`);
+  const s = (citations ?? []).slice(0, 2).map((c) => `Tóm tắt bài: ${c.title}`);
   s.push('Còn tin nào liên quan không?');
   return s;
 }
-
-// Tailwind-styled renderers for the assistant's markdown answer.
-const md: Components = {
-  p: ({ children }) => <p className="mb-2 whitespace-pre-wrap last:mb-0">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-  em: ({ children }) => <em className="italic">{children}</em>,
-  ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
-  ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
-  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline dark:text-indigo-400">
-      {children}
-    </a>
-  ),
-  h1: ({ children }) => <h3 className="mb-1 mt-2 text-base font-semibold">{children}</h3>,
-  h2: ({ children }) => <h3 className="mb-1 mt-2 text-base font-semibold">{children}</h3>,
-  h3: ({ children }) => <h3 className="mb-1 mt-2 text-base font-semibold">{children}</h3>,
-  code: ({ children }) => (
-    <code className="rounded bg-slate-100 px-1 py-0.5 text-[13px] dark:bg-slate-800">{children}</code>
-  ),
-};
-
-const EXAMPLES = [
-  'Vietnam Airlines đặt mục tiêu lợi nhuận bao nhiêu năm nay?',
-  'Có tin gì mới về kinh tế Việt Nam?',
-  'Tóm tắt một tin đáng chú ý hôm nay.',
-];
 
 export default function Home() {
   const {
@@ -89,42 +84,37 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-dvh bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex h-dvh bg-bg text-fg">
       {/* ---------- Sidebar ---------- */}
       <aside
         className={`${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-slate-200 bg-white transition-transform md:relative md:translate-x-0 dark:border-slate-800 dark:bg-slate-900`}
+        } fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-black/10 bg-bg transition-transform md:relative md:translate-x-0`}
       >
-        <div className="flex items-center gap-2.5 px-4 py-3.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-500/30">
+        <div className="flex items-center gap-2.5 border-b border-black/10 px-4 py-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-sm font-black text-on-accent">
             Đ
           </div>
-          <span className="font-semibold tracking-tight">Điểm Tin AI</span>
+          <span className="font-display text-sm font-extrabold tracking-tight">ĐIỂM TIN AI</span>
         </div>
 
-        <div className="px-3">
+        <div className="p-3">
           <button
             onClick={() => {
               newConversation();
               setSidebarOpen(false);
             }}
             disabled={streaming}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-black/15 px-3 py-2.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-40"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Cuộc trò chuyện mới
+            + Cuộc trò chuyện mới
           </button>
         </div>
 
-        <p className="px-4 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-          Lịch sử
-        </p>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
+        <p className="label px-4 pb-1 pt-2">Lịch sử</p>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
           {conversations.length === 0 && (
-            <p className="px-2 py-2 text-sm text-slate-400">Chưa có hội thoại nào.</p>
+            <p className="px-1 py-2 text-sm text-muted">Chưa có hội thoại nào.</p>
           )}
           {conversations.map((c) => (
             <button
@@ -133,10 +123,10 @@ export default function Home() {
                 void loadConversation(c.id);
                 setSidebarOpen(false);
               }}
-              className={`block w-full truncate rounded-lg px-3 py-2 text-left text-sm transition ${
+              className={`block w-full truncate border-l-2 py-1.5 pl-2 pr-1 text-left text-sm transition ${
                 c.id === conversationId
-                  ? 'bg-indigo-50 font-medium text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  ? 'border-accent font-medium text-fg'
+                  : 'border-transparent text-muted hover:border-black/20 hover:text-fg'
               }`}
               title={c.title ?? 'Hội thoại'}
             >
@@ -146,66 +136,33 @@ export default function Home() {
         </nav>
       </aside>
 
-      {/* Backdrop for mobile sidebar */}
       {sidebarOpen && (
-        <div
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-20 bg-black/30 md:hidden"
-        />
+        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-20 bg-black/60 md:hidden" />
       )}
 
       {/* ---------- Main ---------- */}
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(60%_100%_at_50%_0%,rgba(99,102,241,0.12),transparent)]"
-        />
-
-        {/* Header */}
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-950/60">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden dark:hover:bg-slate-800"
-            aria-label="Mở lịch sử"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M3 6h18M3 12h18M3 18h18" />
-            </svg>
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-black/10 bg-bg/90 px-4 py-3 backdrop-blur">
+          <button onClick={() => setSidebarOpen(true)} className="border border-black/15 px-2 py-1 text-xs md:hidden" aria-label="Mở lịch sử">
+            ☰
           </button>
           <div className="flex-1">
-            <h1 className="text-[15px] font-semibold leading-tight tracking-tight">
+            <h1 className="font-display text-[15px] font-bold leading-tight tracking-tight">
               Hỏi-đáp tin tức tiếng Việt
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Trả lời dựa trên tin đã nạp, kèm trích dẫn nguồn
-            </p>
+            <p className="label mt-0.5">Trả lời dựa trên tin đã nạp · kèm nguồn</p>
           </div>
-          <Link
-            href="/dashboard"
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-indigo-300"
-          >
-            📊 Bảng tin
-          </Link>
-          <Link
-            href="/articles"
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-indigo-300"
-          >
-            📰 Thư viện
-          </Link>
-          <ThemeToggle />
+          <Nav current="/" />
         </header>
 
-        {/* Topic filter chips */}
         {topics.length > 0 && (
-          <div className="border-b border-slate-200/60 bg-white/40 px-4 py-2 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/30">
+          <div className="border-b border-black/10 bg-surface px-4 py-2">
             <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-xs text-slate-400">Lĩnh vực:</span>
+              <span className="label mr-1">Lĩnh vực</span>
               <button
                 onClick={() => setTopic(undefined)}
-                className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
-                  !topic
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                className={`rounded-md border px-2 py-0.5 text-xs transition ${
+                  !topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
                 }`}
               >
                 Tất cả
@@ -214,10 +171,8 @@ export default function Home() {
                 <button
                   key={t.topic}
                   onClick={() => setTopic(topic === t.topic ? undefined : t.topic)}
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
-                    topic === t.topic
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                  className={`rounded-md border px-2 py-0.5 text-xs transition ${
+                    topic === t.topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
                   }`}
                 >
                   {t.label}
@@ -231,24 +186,24 @@ export default function Home() {
         <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 overflow-y-auto px-4 py-6">
           {messages.length === 0 && (
             <div className="flex flex-1 flex-col items-center justify-center gap-6 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xl font-bold text-white shadow-xl shadow-indigo-500/30">
+              <div className="flex h-16 w-16 items-center justify-center rounded-md bg-accent text-2xl font-black text-on-accent">
                 Đ
               </div>
-              <div className="space-y-1.5">
-                <h2 className="text-xl font-semibold tracking-tight">
+              <div className="space-y-2">
+                <h2 className="font-display text-3xl font-extrabold tracking-tight">
                   Hỏi bất cứ điều gì về tin tức
                 </h2>
-                <p className="max-w-md text-sm text-slate-500 dark:text-slate-400">
+                <p className="mx-auto max-w-md text-sm text-muted">
                   Câu trả lời được tổng hợp từ các bài báo đã nạp và luôn kèm
                   trích dẫn nguồn để bạn kiểm chứng.
                 </p>
               </div>
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-col items-stretch gap-2">
                 {EXAMPLES.map((ex) => (
                   <button
                     key={ex}
                     onClick={() => send(ex)}
-                    className="rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10 dark:hover:text-indigo-300"
+                    className="border border-black/12 bg-surface px-3.5 py-2 text-left text-sm text-muted transition hover:border-accent hover:text-fg"
                   >
                     {ex}
                   </button>
@@ -262,15 +217,10 @@ export default function Home() {
             const isEmptyStreaming =
               !isUser && m.content === '' && streaming && i === messages.length - 1;
             return (
-              <div
-                key={i}
-                className={`msg-in flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
-              >
+              <div key={i} className={`msg-in flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div
-                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold ${
-                    isUser
-                      ? 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-                      : 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/25'
+                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-bold ${
+                    isUser ? 'border border-black/20 text-fg' : 'bg-fg text-bg'
                   }`}
                 >
                   {isUser ? 'Bạn' : 'Đ'}
@@ -280,21 +230,19 @@ export default function Home() {
                   <div
                     className={
                       isUser
-                        ? 'rounded-2xl rounded-tr-md bg-gradient-to-br from-indigo-600 to-indigo-500 px-4 py-2.5 text-[15px] leading-relaxed text-white shadow-sm'
-                        : 'rounded-2xl rounded-tl-md bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-800'
+                        ? 'rounded-md bg-fg px-4 py-2.5 leading-relaxed text-bg'
+                        : 'rounded-md border border-black/10 bg-surface px-4 py-3 leading-relaxed'
                     }
                   >
                     {isUser ? (
                       <p className="whitespace-pre-wrap">{m.content}</p>
                     ) : (
-                      <div className="text-[15px] leading-relaxed">
+                      <div className="leading-relaxed">
                         <ReactMarkdown components={md}>{m.content}</ReactMarkdown>
                         {isEmptyStreaming && (
-                          <span className="inline-flex items-center gap-2 text-sm text-slate-400">
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-600" />
-                            {phase === 'retrieving'
-                              ? 'Đang tìm nguồn liên quan…'
-                              : 'Đang soạn câu trả lời…'}
+                          <span className="inline-flex items-center gap-2 text-sm text-muted">
+                            <span className="caret text-accent">▍</span>
+                            {phase === 'retrieving' ? 'Đang tìm nguồn liên quan…' : 'Đang soạn câu trả lời…'}
                           </span>
                         )}
                       </div>
@@ -302,17 +250,15 @@ export default function Home() {
                   </div>
 
                   {!isUser && m.content && !isEmptyStreaming && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <CopyButton text={m.content} />
                       {m.id && (
                         <>
                           <button
                             onClick={() => sendFeedback(m.id!, 1)}
                             title="Hữu ích"
-                            className={`rounded-md px-1.5 py-0.5 text-[11px] transition ${
-                              m.feedback === 1
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                                : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
+                              m.feedback === 1 ? 'border-accent text-accent' : 'border-transparent text-muted hover:border-black/20'
                             }`}
                           >
                             👍
@@ -320,10 +266,8 @@ export default function Home() {
                           <button
                             onClick={() => sendFeedback(m.id!, -1)}
                             title="Chưa tốt"
-                            className={`rounded-md px-1.5 py-0.5 text-[11px] transition ${
-                              m.feedback === -1
-                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
-                                : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
+                              m.feedback === -1 ? 'border-black/40 text-fg' : 'border-transparent text-muted hover:border-black/20'
                             }`}
                           >
                             👎
@@ -335,9 +279,7 @@ export default function Home() {
 
                   {m.citations && m.citations.length > 0 && (
                     <div className="flex flex-col gap-1.5">
-                      <p className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                        Nguồn trích dẫn
-                      </p>
+                      <p className="label">Nguồn trích dẫn</p>
                       <div className="flex flex-wrap gap-1.5">
                         {m.citations.map((c) => (
                           <a
@@ -345,16 +287,14 @@ export default function Home() {
                             href={c.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="group inline-flex max-w-xs items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"
+                            className="group inline-flex max-w-xs items-center gap-1.5 border border-black/10 bg-surface px-2 py-1 text-xs text-muted transition hover:border-accent"
                             title={`${c.title} — ${c.source}`}
                           >
-                            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-indigo-100 text-[10px] font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                            <span className="flex h-4 w-4 shrink-0 items-center justify-center bg-fg text-[10px] font-bold text-bg">
                               {c.index}
                             </span>
-                            <span className="truncate font-medium text-slate-700 group-hover:text-indigo-700 dark:text-slate-200 dark:group-hover:text-indigo-300">
-                              {c.title}
-                            </span>
-                            <span className="shrink-0 text-slate-400">· {c.source}</span>
+                            <span className="truncate font-medium text-fg">{c.title}</span>
+                            <span className="shrink-0">· {c.source}</span>
                           </a>
                         ))}
                       </div>
@@ -365,30 +305,22 @@ export default function Home() {
             );
           })}
 
-          {/* Follow-up suggestions / not-found fallback after the latest answer */}
           {(() => {
             if (streaming || messages.length === 0) return null;
             const last = messages[messages.length - 1];
             if (last.role !== 'assistant' || !last.content) return null;
             if (last.content.startsWith('⚠️')) return null;
 
-            // A3: when the model couldn't answer, offer recovery actions.
             if (last.content.includes('không tìm thấy')) {
               return (
                 <div className="flex flex-wrap items-center gap-2 pl-11">
-                  <span className="text-xs text-slate-400">Thử:</span>
+                  <span className="label">Thử</span>
                   {topic && (
-                    <button
-                      onClick={() => setTopic(undefined)}
-                      className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
-                    >
+                    <button onClick={() => setTopic(undefined)} className="border border-black/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
                       Bỏ lọc lĩnh vực
                     </button>
                   )}
-                  <Link
-                    href="/articles"
-                    className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300"
-                  >
+                  <Link href="/articles" className="border border-black/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
                     Duyệt thư viện bài →
                   </Link>
                 </div>
@@ -401,7 +333,7 @@ export default function Home() {
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="max-w-xs truncate rounded-full border border-indigo-200 bg-indigo-50/50 px-3 py-1.5 text-xs text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                    className="max-w-xs truncate border border-black/12 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg"
                     title={s}
                   >
                     {s}
@@ -414,14 +346,14 @@ export default function Home() {
         </main>
 
         {/* Composer */}
-        <div className="border-t border-slate-200/70 bg-white/70 backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-950/60">
+        <div className="border-t border-black/10 bg-bg">
           <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 py-3.5">
-            <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/10 dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-end gap-2 border border-black/15 bg-surface p-1.5 focus-within:border-accent">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Nhập câu hỏi về tin tức…"
-                className="flex-1 bg-transparent px-3 py-2 text-[15px] text-slate-900 placeholder:text-slate-400 outline-none dark:text-slate-100"
+                className="flex-1 bg-transparent px-3 py-2 text-fg placeholder:text-muted outline-none"
               />
               {streaming ? (
                 <button
@@ -429,25 +361,22 @@ export default function Home() {
                   onClick={stop}
                   aria-label="Dừng"
                   title="Dừng tạo câu trả lời"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700 text-white shadow-sm transition hover:bg-slate-800"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-black/20 text-fg"
                 >
-                  <span className="h-3 w-3 rounded-sm bg-white" />
+                  <span className="h-3 w-3 bg-fg" />
                 </button>
               ) : (
                 <button
                   type="submit"
                   disabled={!input.trim()}
                   aria-label="Gửi"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow-sm transition hover:from-indigo-500 hover:to-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex h-10 shrink-0 items-center justify-center rounded-md bg-accent px-5 font-bold text-on-accent transition hover:brightness-95 disabled:opacity-40"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 2 11 13" />
-                    <path d="M22 2 15 22l-4-9-9-4 20-7z" />
-                  </svg>
+                  GỬI
                 </button>
               )}
             </div>
-            <p className="mt-2 px-1 text-center text-[11px] text-slate-400">
+            <p className="label mt-2 text-center">
               Điểm Tin AI chỉ trả lời dựa trên tin đã nạp · có thể thiếu tin mới nhất
             </p>
           </form>

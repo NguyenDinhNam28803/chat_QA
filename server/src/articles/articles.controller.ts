@@ -21,6 +21,11 @@ export class ArticlesController {
     return this.articles.related(id);
   }
 
+  @Get(':id/summary')
+  summary(@Param('id') id: string) {
+    return this.articles.getSummary(id);
+  }
+
   @Get()
   list(
     @Query('q') q?: string,

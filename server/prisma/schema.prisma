@@ -22,12 +22,20 @@ model Article {
   content     String
   contentHash String    @unique
   topic       String?
+  summary     String?
   createdAt   DateTime  @default(now())
 
   chunks Chunk[]
 
   @@index([publishedAt])
   @@index([topic])
+}
+
+model DailyBrief {
+  id        String   @id @default(cuid())
+  date      String   @unique
+  content   String
+  createdAt DateTime @default(now())
 }
 
 model Chunk {

@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ThemeToggle } from '../../components/ThemeToggle';
 import { Skeleton, highlight } from '../../components/ui';
+import { Nav } from '../../components/Nav';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -31,7 +31,7 @@ export default function ArticlesPage() {
   const [topics, setTopics] = useState<TopicInfo[]>([]);
   const [topic, setTopic] = useState<string | undefined>();
   const [q, setQ] = useState('');
-  const [query, setQuery] = useState(''); // debounced/submitted value
+  const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,7 +47,6 @@ export default function ArticlesPage() {
     })();
   }, []);
 
-  // Live search: debounce the input into the query (350ms).
   useEffect(() => {
     const id = setTimeout(() => {
       setPage(1);
@@ -80,24 +79,21 @@ export default function ArticlesPage() {
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 1;
 
   return (
-    <div className="min-h-dvh bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl dark:border-slate-800/70 dark:bg-slate-950/60">
+    <div className="min-h-dvh bg-bg text-fg">
+      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3.5">
-          <Link
-            href="/"
-            className="rounded-lg px-2.5 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
+          <Link href="/" className="label border border-transparent px-2 py-1 hover:border-black/20 hover:text-fg">
             ← Chat
           </Link>
-          <h1 className="flex-1 text-[15px] font-semibold tracking-tight">
-            Thư viện bài · {data?.total ?? 0} bài
+          <h1 className="flex-1 font-display text-[15px] font-bold tracking-tight">
+            Thư viện · {data?.total ?? 0}
           </h1>
-          <ThemeToggle />
+          <Nav current="/articles" />
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-4xl px-4 py-6">
-        {/* Search */}
+        {/* Search — the single accent action on this screen */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -110,27 +106,22 @@ export default function ArticlesPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm trong tiêu đề + nội dung…"
-            className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[15px] outline-none focus:border-indigo-400 dark:border-slate-800 dark:bg-slate-900"
+            className="flex-1 border border-black/15 bg-surface px-4 py-2.5 outline-none focus:border-accent"
           />
-          <button
-            type="submit"
-            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            Tìm
+          <button type="submit" className="rounded-md bg-accent px-5 py-2.5 font-bold text-on-accent transition hover:brightness-95">
+            TÌM
           </button>
         </form>
 
         {/* Topic chips */}
-        <div className="mb-5 flex flex-wrap gap-1.5">
+        <div className="mb-6 flex flex-wrap gap-1.5">
           <button
             onClick={() => {
               setPage(1);
               setTopic(undefined);
             }}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
-              !topic
-                ? 'bg-indigo-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+            className={`rounded-md border px-2.5 py-1 text-xs transition ${
+              !topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
             }`}
           >
             Tất cả
@@ -142,10 +133,8 @@ export default function ArticlesPage() {
                 setPage(1);
                 setTopic(topic === t.topic ? undefined : t.topic);
               }}
-              className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
-                topic === t.topic
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+              className={`rounded-md border px-2.5 py-1 text-xs transition ${
+                topic === t.topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
               }`}
             >
               {t.label} ({t.count})
@@ -157,10 +146,7 @@ export default function ArticlesPage() {
         {loading && !data && (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-              >
+              <div key={i} className="border border-black/10 rounded-lg bg-surface p-4">
                 <Skeleton className="mb-2 h-3 w-32" />
                 <Skeleton className="mb-2 h-5 w-3/4" />
                 <Skeleton className="h-4 w-full" />
@@ -169,64 +155,40 @@ export default function ArticlesPage() {
           </div>
         )}
         {!loading && data?.items.length === 0 && (
-          <p className="text-sm text-slate-400">Không có bài nào khớp.</p>
+          <p className="text-sm text-muted">Không có bài nào khớp.</p>
         )}
         <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>
           {data?.items.map((a) => (
-            <li
-              key={a.id}
-              className="group rounded-xl border border-slate-200 bg-white p-4 transition hover:border-indigo-300 hover:shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:hover:border-indigo-500/40"
-            >
-              <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-                  {labelOf(a.topic)}
-                </span>
-                <span className="text-slate-400">{a.source}</span>
+            <li key={a.id} className="group border border-black/10 rounded-lg bg-surface p-4 transition hover:border-accent">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="label border border-black/15 px-1.5 py-0.5 text-fg">{labelOf(a.topic)}</span>
+                <span className="text-xs text-muted">{a.source}</span>
                 {a.publishedAt && (
-                  <span className="text-slate-400">
-                    · {new Date(a.publishedAt).toLocaleDateString('vi-VN')}
-                  </span>
+                  <span className="text-xs text-muted">· {new Date(a.publishedAt).toLocaleDateString('vi-VN')}</span>
                 )}
               </div>
-              <Link
-                href={`/articles/${a.id}`}
-                className="block text-[17px] font-semibold leading-snug text-slate-800 transition group-hover:text-indigo-700 dark:text-slate-100 dark:group-hover:text-indigo-300"
-              >
+              <Link href={`/articles/${a.id}`} className="block font-display text-lg font-bold leading-snug transition group-hover:text-accent">
                 {highlight(a.title, query)}
               </Link>
               {a.snippet && (
-                <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted">
                   {highlight(a.snippet, query)}…
                 </p>
               )}
-              <Link
-                href={`/articles/${a.id}`}
-                className="mt-2 inline-block text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-              >
+              <Link href={`/articles/${a.id}`} className="label mt-2 inline-block hover:text-accent">
                 Đọc tiếp →
               </Link>
             </li>
           ))}
         </ul>
 
-        {/* Pagination */}
         {data && totalPages > 1 && (
           <div className="mt-6 flex items-center justify-center gap-3 text-sm">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40 dark:border-slate-700"
-            >
+            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="border border-black/15 px-3 py-1.5 disabled:opacity-30">
               ← Trước
             </button>
-            <span className="text-slate-500">
-              Trang {page}/{totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40 dark:border-slate-700"
-            >
+            <span className="text-muted">Trang {page}/{totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="border border-black/15 px-3 py-1.5 disabled:opacity-30">
               Sau →
             </button>
           </div>

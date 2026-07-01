@@ -116,6 +116,51 @@ Sau CT-1, công tắc này không còn cần thiết để chat mượt, nhưng 
 
 ---
 
+## CT-19 · 3 trụ tính năng AI (Summary/Brief/Timeline/Compare/Insight) — 2026-07-01
+
+Thêm 5 tính năng AI tận dụng RAG + đa nguồn, **cache LLM để né rate-limit free-tier**.
+- **Schema:** `Article.summary` (cache) + bảng `DailyBrief(date @unique, content)`. `LlmService.generate(system,user)` (single-shot, tách `streamMessages` dùng chung với streamAnswer) + `features.prompts.ts`.
+- **Trụ 1 — Tóm tắt:** `GET /articles/:id/summary` (cache trong Article.summary) + nút "Tóm tắt AI" ở chi tiết bài · `GET /brief` (cache theo ngày, tổng hợp 24 tin mới nhất) + trang `/brief`.
+- **Trụ 2 — Dòng thời gian & Đối chiếu:** `GET /timeline?q=` (full-text search → sắp theo `publishedAt` + narrative LLM) + trang `/timeline` (mốc thời gian). `GET /compare?q=` (nhóm bài theo nguồn → LLM so sánh góc nhìn) + trang `/compare`.
+- **Trụ 3 — Insight:** `GET /insights` (THUẦN SQL, không LLM): bài/ngày 14 ngày, top nguồn, từ khóa nổi (đếm term trong tiêu đề 3 ngày, lọc stopwords tiếng Việt). Mở rộng `/dashboard`.
+- **Endpoints:** summary trong ArticlesController; brief/timeline/compare/insights trong `FeaturesController` (@Controller() root). ArticlesModule import LlmModule.
+- **UI:** component `Nav` (6 mục) + `Markdown` dùng chung (components/ui.tsx). Timeline/Compare có narrative graceful (LLM lỗi vẫn hiện data).
+- **Verify:** BE build+lint+test 14/14; web typecheck+lint 0; Docker rebuild; test thật 5 endpoint OK (summary 16s, timeline 15 bài+narrative, compare nhóm 2 nguồn+bảng, brief nhóm lĩnh vực cache, insights nhanh).
+
+## CT-18 · Đổi design.md → "Robotics Lab" (light) — 2026-07-01
+
+User đổi `design.md` sang **Robotics Lab** (bench-white, safety-orange). Re-skin toàn bộ.
+- **Palette (light):** bg #F2F3F5 (nền), surface #FFFFFF (thẻ), fg #17191C (chữ), muted #636870 (viền/metadata), **accent #FF6A00 (cam an toàn — 1 hành động/màn)**, on-accent #FFFFFF.
+- **Font:** Space Grotesk (display/heading, cỡ lớn), Inter (body), IBM Plex Mono (label) — cả 3 subset latin+vietnamese.
+- **Bo góc mềm:** radius tokens sm 3px / md 6px / lg 10px (nút rounded-md, thẻ rounded-lg).
+- Quy trình: đổi giá trị token + font trong globals.css/layout.tsx, rồi sed đổi lớp dark→light trên 5 file (`border-white/`→`border-black/`, `bg-white/`→`bg-black/`, `divide-white/`→`divide-black/`, `decoration-white/`→`decoration-black/`, `brightness-110`→`95`, `rounded-sm`→`rounded-md`, thêm `rounded-lg` cho card).
+- **Verify:** typecheck+lint 0, local next build OK, rebuild Docker; CSS chứa #ff6a00/#f2f3f5/#17191c + Space Grotesk + IBM Plex Mono; trang 200.
+
+## CT-17 · Đổi design.md → "The Verge" (dark, đã thay bằng CT-18) — 2026-07-01
+
+User cập nhật `design.md` sang hệ mới **The Verge** (tech-editorial dark, rave-flyer). Re-skin lại toàn bộ 7 file web:
+- **Palette (dark):** bg #0C0C10, surface #14141C, fg #F2FFF4 (mint-trắng), muted #93A1A8, **accent #9EFF00 (xanh chanh acid — 1 hành động/màn)**, on-accent #0C0C10.
+- **3 font:** Archivo (display/heading, weight 800-900, cỡ lớn), Inter (body), JetBrains Mono (label). next/font: Archivo+Inter subset latin+vietnamese, JetBrains chỉ latin (font không có subset vietnamese → dấu tiếng Việt fallback).
+- Tokens Tailwind v4 `@theme`: `bg-bg/bg-surface/text-fg/text-muted/text-accent/bg-accent/text-on-accent`; viền dark dùng `border-white/10-20`.
+- Accent 1 hành động/màn: chat=GỬI, thư viện=TÌM, chi tiết="Đọc bản gốc", dashboard=thanh biểu đồ (+ logo mark là signature accent). Heading dùng Archivo đậm to tạo năng lượng "rave-flyer".
+- **Verify:** typecheck+lint 0, **local `next build` OK** (validate font subset), rebuild Docker frontend; CSS bundle chứa #9eff00/#0c0c10/#f2fff4 + Archivo + JetBrains; trang render 200.
+
+## CT-16 · Thiết kế lại theo design.md — "Dispatch Mono" (đã thay bằng CT-17) — 2026-07-01
+
+Thay toàn bộ hệ "Editorial Indigo" bằng **Dispatch Mono** (theo `design.md`): press độc lập, monospace, một accent cam.
+- **Palette:** ink #1B1714 (chữ/tiêu đề), muted #716A62 (viền/metadata), **accent #D9541A (cam — CHỈ 1 hành động/màn hình)**, paper #F6F1E7 (nền), surface #FDF9EF (thẻ). Bỏ dark mode (design là light-only) → xoá `ThemeToggle`, `@custom-variant dark`, script no-FOUC.
+- **Font:** IBM Plex Mono toàn bộ (next/font, subset latin+vietnamese).
+- **Hình khối:** phẳng (KHÔNG gradient/shadow), viền 1px, bo góc sắc (0/2px/4px), nhiều khoảng trắng, label uppercase letter-spacing 0.08em.
+- **Accent 1 hành động/màn:** chat = nút GỬI; thư viện = nút TÌM; chi tiết = "Đọc bản gốc"; dashboard = thanh biểu đồ. Còn lại dùng ink/muted (kể cả link trong câu trả lời).
+- **File:** viết lại `globals.css`, `layout.tsx`, `components/ui.tsx`, `page.tsx`, `articles/page.tsx`, `articles/[id]/page.tsx`, `dashboard/page.tsx`.
+- **Verify:** web typecheck+lint 0; rebuild Docker frontend; bundle CSS chứa #d9541a/#f6f1e7/#1b1714 + IBM Plex Mono; các trang render 200.
+
+## CT-15 · Thêm nguồn tin + cap item/feed — 2026-07-01
+
+- Mở rộng `feeds.config.ts` lên **7 feed** (thêm Thanh Niên Thế giới/Công nghệ + VietNamNet Thời sự/Công nghệ). **Sửa URL VietNamNet**: bản thật bỏ tiền tố `/rss/` (`vietnamnet.vn/thoi-su.rss`); feed "tin mới nhất" của VietNamNet 404 → bỏ.
+- **`MAX_ITEMS_PER_FEED = 60`** trong `rss.service.ts` (`.slice(0,60)`): VietNamNet Thời sự trả ~1000 item, nếu nạp hết sẽ chiếm worker cả giờ và chặn feed khác. Lấy 60 tin mới nhất/lần, phần còn lại cuốn chiếu qua chu kỳ 30'.
+- Quy trình khi đổi feed: sửa `feeds.config.ts` → `docker compose --profile app up -d --build backend` → `POST /ingestion/run` để nạp ngay (repeatable job chỉ chạy ở mốc 30' kế tiếp).
+
 ## CT-14 · Phase 12 — Web UX & Insight (Nhóm A + B) — 2026-07-01
 
 **Phân tích số liệu** (788 bài, tăng ~310/ngày): chủ đề lệch nặng (Thể thao 34.8% ↔ Thế giới 1%), **14.3% câu trả lời "không tìm thấy"**, 100% có citations, chat 2.7 msg/hội thoại.

@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI } from '@langchain/openai';
+import {
+  SystemMessage,
+  HumanMessage,
+  type BaseMessage,
+} from '@langchain/core/messages';
 import { buildQaMessages } from './qa.prompt';
 
-const STREAM_TIMEOUT_MS = 30_000;
+const STREAM_TIMEOUT_MS = 60_000;
 
 @Injectable()
 export class LlmService {
@@ -48,9 +53,26 @@ export class LlmService {
     question: string,
     context: string,
   ): AsyncIterable<string> {
-    const messages = buildQaMessages(question, context);
-    let lastErr: unknown;
+    yield* this.streamMessages(buildQaMessages(question, context));
+  }
 
+  /** Single-shot generation (used by summary / brief / compare / timeline). */
+  async generate(systemText: string, userText: string): Promise<string> {
+    let out = '';
+    for await (const t of this.streamMessages([
+      new SystemMessage(systemText),
+      new HumanMessage(userText),
+    ])) {
+      out += t;
+    }
+    return out;
+  }
+
+  /** Try each model in order with an abortable timeout; manual fallback. */
+  private async *streamMessages(
+    messages: BaseMessage[],
+  ): AsyncIterable<string> {
+    let lastErr: unknown;
     for (const { name, model } of this.models) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
@@ -66,14 +88,11 @@ export class LlmService {
             yield text;
           }
         }
-        return; // success
+        return;
       } catch (err) {
         lastErr = err;
         this.logger.warn(`model ${name} failed: ${String(err)}`);
-        // If we already streamed part of an answer, we cannot safely restart on
-        // another model — surface the error instead of duplicating output.
         if (yielded > 0) throw err;
-        // otherwise: loop to the next model
       } finally {
         clearTimeout(timer);
       }

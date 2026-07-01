@@ -10,6 +10,11 @@ export interface RawFeedItem {
   summaryHtml: string;
 }
 
+// Cap items per feed run so a huge feed (e.g. VietNamNet returns ~1000) can't
+// dominate the queue and starve the other feeds. We take the newest N; the
+// 30-min repeat picks up the rest over time.
+const MAX_ITEMS_PER_FEED = 60;
+
 @Injectable()
 export class RssService {
   private readonly logger = new Logger(RssService.name);
@@ -19,6 +24,7 @@ export class RssService {
     const parsed = await this.parser.parseURL(feed.url);
     const items = (parsed.items ?? [])
       .filter((i) => i.link && i.title)
+      .slice(0, MAX_ITEMS_PER_FEED)
       .map((i) => {
         const encoded = (i as { 'content:encoded'?: string })[
           'content:encoded'
