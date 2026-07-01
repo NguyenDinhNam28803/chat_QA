@@ -30,10 +30,18 @@ export class ChatService {
     });
   }
 
-  stream(question: string, conversationId?: string): Observable<MessageEvent> {
+  stream(
+    question: string,
+    conversationId?: string,
+    topic?: string,
+  ): Observable<MessageEvent> {
     return new Observable<MessageEvent>((sub) => {
       (async () => {
-        const { context, citations } = await this.retrieval.search(question);
+        const { context, citations } = await this.retrieval.search(
+          question,
+          5,
+          topic,
+        );
         const convo = conversationId
           ? { id: conversationId }
           : await this.prisma.conversation.create({

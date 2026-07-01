@@ -78,6 +78,9 @@ export class LlmService {
         clearTimeout(timer);
       }
     }
-    throw lastErr ?? new Error('All LLM models failed');
+    if (lastErr instanceof Error) throw lastErr;
+    throw new Error(
+      typeof lastErr === 'string' ? lastErr : 'All LLM models failed',
+    );
   }
 }

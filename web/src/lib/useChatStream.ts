@@ -20,6 +20,12 @@ export interface ConversationSummary {
   createdAt: string;
 }
 
+export interface TopicInfo {
+  topic: string;
+  label: string;
+  count: number;
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL;
 
 export function useChatStream() {
@@ -28,6 +34,8 @@ export function useChatStream() {
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [topics, setTopics] = useState<TopicInfo[]>([]);
+  const [topic, setTopic] = useState<string | undefined>();
 
   const refreshList = useCallback(async () => {
     try {
@@ -38,9 +46,19 @@ export function useChatStream() {
     }
   }, []);
 
-  // Load the conversation list once on mount.
+  // Load conversation list + topic filters once on mount. Legitimate async data
+  // fetches (network → setState), not derived state.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshList();
+    void (async () => {
+      try {
+        const res = await fetch(`${API}/articles/topics`);
+        if (res.ok) setTopics(await res.json());
+      } catch {
+        /* ignore */
+      }
+    })();
   }, [refreshList]);
 
   /** Open a past conversation: load its messages into the view. */
@@ -82,6 +100,7 @@ export function useChatStream() {
 
     let url = `${API}/chat/stream?q=${encodeURIComponent(question)}`;
     if (conversationId) url += `&conversationId=${conversationId}`;
+    if (topic) url += `&topic=${encodeURIComponent(topic)}`;
     const es = new EventSource(url);
 
     es.onmessage = (e) => {
@@ -112,6 +131,20 @@ export function useChatStream() {
     };
 
     es.onerror = () => {
+      // Surface the failure instead of leaving an empty bubble (LLM overload,
+      // backend down, network…). Only overwrite if nothing streamed yet.
+      setMessages((m) => {
+        const copy = [...m];
+        const last = copy[copy.length - 1];
+        if (last && last.role === 'assistant' && last.content === '') {
+          copy[copy.length - 1] = {
+            ...last,
+            content:
+              '⚠️ Không nhận được phản hồi (mô hình có thể đang quá tải hoặc mất kết nối). Vui lòng thử lại.',
+          };
+        }
+        return copy;
+      });
       setStreaming(false);
       es.close();
     };
@@ -123,6 +156,9 @@ export function useChatStream() {
     conversationId,
     streaming,
     loadingHistory,
+    topics,
+    topic,
+    setTopic,
     send,
     loadConversation,
     newConversation,

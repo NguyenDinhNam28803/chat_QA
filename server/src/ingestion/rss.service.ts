@@ -19,13 +19,18 @@ export class RssService {
     const parsed = await this.parser.parseURL(feed.url);
     const items = (parsed.items ?? [])
       .filter((i) => i.link && i.title)
-      .map((i) => ({
-        url: i.link!.trim(),
-        title: i.title!.trim(),
-        source: feed.name,
-        publishedAt: i.isoDate ? new Date(i.isoDate) : null,
-        summaryHtml: i['content:encoded'] ?? i.content ?? i.contentSnippet ?? '',
-      }));
+      .map((i) => {
+        const encoded = (i as { 'content:encoded'?: string })[
+          'content:encoded'
+        ];
+        return {
+          url: i.link!.trim(),
+          title: i.title!.trim(),
+          source: feed.name,
+          publishedAt: i.isoDate ? new Date(i.isoDate) : null,
+          summaryHtml: encoded ?? i.content ?? i.contentSnippet ?? '',
+        };
+      });
     this.logger.log(`Feed ${feed.id}: ${items.length} items`);
     return items;
   }

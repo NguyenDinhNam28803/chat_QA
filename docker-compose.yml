@@ -58,6 +58,47 @@ services:
     volumes:
       - newsqa-ollama-ingest:/root/.ollama
 
+  # ---- Application (opt-in via `docker compose --profile app up -d --build`) ----
+  # Default `docker compose up -d` still starts only infra. The app services use
+  # in-cluster hostnames (postgres/redis/ollama) instead of localhost.
+  backend:
+    build: ./server
+    container_name: newsqa-backend
+    profiles: ["app"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Load secrets/models (OPENROUTER_API_KEY, LLM_*, APP_*) from server/.env…
+    env_file:
+      - ./server/.env
+    # …then override the networking vars with in-cluster hostnames (environment
+    # takes precedence over env_file).
+    environment:
+      DATABASE_URL: postgresql://newsqa:newsqa@postgres:5432/newsqa?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      EMBEDDING_BASE_URL: http://ollama:11434
+      EMBEDDING_INGEST_BASE_URL: http://ollama-ingest:11434
+      INGEST_ON_BOOT: "true"
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000
+    container_name: newsqa-frontend
+    profiles: ["app"]
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3001:3001"
+
 volumes:
   newsqa-pgdata:
   newsqa-redisdata:

@@ -10,8 +10,9 @@ export class ChatController {
   stream(
     @Query('q') q: string,
     @Query('conversationId') conversationId?: string,
+    @Query('topic') topic?: string,
   ): Observable<MessageEvent> {
-    return this.chat.stream(q, conversationId);
+    return this.chat.stream(q, conversationId, topic);
   }
 
   /** History sidebar: list past conversations (newest first). */

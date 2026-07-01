@@ -10,6 +10,8 @@ export function buildQaMessages(question: string, context: string) {
       'Không bịa thông tin.',
     ].join(' '),
   );
-  const human = new HumanMessage(`NGỮ CẢNH:\n${context}\n\nCÂU HỎI: ${question}`);
+  const human = new HumanMessage(
+    `NGỮ CẢNH:\n${context}\n\nCÂU HỎI: ${question}`,
+  );
   return [system, human];
 }

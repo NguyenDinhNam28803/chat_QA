@@ -8,6 +8,8 @@ import { IngestionModule } from './ingestion/ingestion.module';
 import { RetrievalModule } from './retrieval/retrieval.module';
 import { LlmModule } from './llm/llm.module';
 import { ChatModule } from './chat/chat.module';
+import { HealthModule } from './health/health.module';
+import { ArticlesModule } from './articles/articles.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { ChatModule } from './chat/chat.module';
     RetrievalModule,
     LlmModule,
     ChatModule,
+    HealthModule,
+    ArticlesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

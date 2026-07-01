@@ -8,6 +8,7 @@ import { ChunkService } from './chunk.service';
 import { ContentExtractorService } from './content-extractor.service';
 import { RssService, RawFeedItem } from './rss.service';
 import { FeedSource } from './feeds.config';
+import { classifyTopic } from './topic.classifier';
 
 const toVectorLiteral = (v: number[]) => `[${v.join(',')}]`;
 
@@ -24,7 +25,9 @@ export class IngestionService {
     private readonly rss: RssService,
   ) {}
 
-  async ingestFeed(feed: FeedSource): Promise<{ processed: number; skipped: number }> {
+  async ingestFeed(
+    feed: FeedSource,
+  ): Promise<{ processed: number; skipped: number }> {
     const items = await this.rss.fetchFeed(feed);
     let processed = 0;
     let skipped = 0;
@@ -36,7 +39,9 @@ export class IngestionService {
       if (r === 'inserted') processed++;
       else skipped++;
     }
-    this.logger.log(`Feed ${feed.id}: processed=${processed} skipped=${skipped}`);
+    this.logger.log(
+      `Feed ${feed.id}: processed=${processed} skipped=${skipped}`,
+    );
     return { processed, skipped };
   }
 
@@ -52,7 +57,9 @@ export class IngestionService {
     }
     const chunks = this.chunker.chunk(content);
     if (chunks.length === 0) return 'skipped';
-    const vectors = await this.embedding.embedBatch(chunks.map((c) => c.content));
+    const vectors = await this.embedding.embedBatch(
+      chunks.map((c) => c.content),
+    );
 
     await this.prisma.$transaction(async (tx) => {
       const article = await tx.article.create({
@@ -63,6 +70,7 @@ export class IngestionService {
           publishedAt: item.publishedAt ?? undefined,
           content,
           contentHash,
+          topic: classifyTopic(item.title, content),
         },
       });
       for (let i = 0; i < chunks.length; i++) {

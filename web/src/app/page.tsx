@@ -1,6 +1,55 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useChatStream } from '../lib/useChatStream';
+import Link from 'next/link';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import { useChatStream, type Citation } from '../lib/useChatStream';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        void navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+      title="Sao chép"
+    >
+      {copied ? '✓ Đã chép' : '⧉ Chép'}
+    </button>
+  );
+}
+
+/** Suggested follow-up questions derived from an answer's citations (no LLM). */
+function followUps(citations?: Citation[]): string[] {
+  const s = (citations ?? [])
+    .slice(0, 2)
+    .map((c) => `Tóm tắt bài: ${c.title}`);
+  s.push('Còn tin nào liên quan không?');
+  return s;
+}
+
+// Tailwind-styled renderers for the assistant's markdown answer.
+const md: Components = {
+  p: ({ children }) => <p className="mb-2 whitespace-pre-wrap last:mb-0">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  em: ({ children }) => <em className="italic">{children}</em>,
+  ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline dark:text-indigo-400">
+      {children}
+    </a>
+  ),
+  h1: ({ children }) => <h3 className="mb-1 mt-2 text-base font-semibold">{children}</h3>,
+  h2: ({ children }) => <h3 className="mb-1 mt-2 text-base font-semibold">{children}</h3>,
+  h3: ({ children }) => <h3 className="mb-1 mt-2 text-base font-semibold">{children}</h3>,
+  code: ({ children }) => (
+    <code className="rounded bg-slate-100 px-1 py-0.5 text-[13px] dark:bg-slate-800">{children}</code>
+  ),
+};
 
 const EXAMPLES = [
   'Vietnam Airlines đặt mục tiêu lợi nhuận bao nhiêu năm nay?',
@@ -14,6 +63,9 @@ export default function Home() {
     conversations,
     conversationId,
     streaming,
+    topics,
+    topic,
+    setTopic,
     send,
     loadConversation,
     newConversation,
@@ -124,11 +176,45 @@ export default function Home() {
               Trả lời dựa trên tin đã nạp, kèm trích dẫn nguồn
             </p>
           </div>
-          <span className="hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600 ring-1 ring-inset ring-emerald-500/20 sm:inline-flex dark:text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Trực tuyến
-          </span>
+          <Link
+            href="/articles"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-indigo-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-indigo-300"
+          >
+            📰 Thư viện bài
+          </Link>
         </header>
+
+        {/* Topic filter chips */}
+        {topics.length > 0 && (
+          <div className="border-b border-slate-200/60 bg-white/40 px-4 py-2 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/30">
+            <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs text-slate-400">Lĩnh vực:</span>
+              <button
+                onClick={() => setTopic(undefined)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                  !topic
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                }`}
+              >
+                Tất cả
+              </button>
+              {topics.map((t) => (
+                <button
+                  key={t.topic}
+                  onClick={() => setTopic(topic === t.topic ? undefined : t.topic)}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                    topic === t.topic
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 overflow-y-auto px-4 py-6">
@@ -187,11 +273,19 @@ export default function Home() {
                         : 'rounded-2xl rounded-tl-md bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-800'
                     }
                   >
-                    <p className="whitespace-pre-wrap">
-                      {m.content}
-                      {isEmptyStreaming && <span className="caret text-indigo-400">▍</span>}
-                    </p>
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap">{m.content}</p>
+                    ) : (
+                      <div className="text-[15px] leading-relaxed">
+                        <ReactMarkdown components={md}>{m.content}</ReactMarkdown>
+                        {isEmptyStreaming && <span className="caret text-indigo-400">▍</span>}
+                      </div>
+                    )}
                   </div>
+
+                  {!isUser && m.content && !isEmptyStreaming && (
+                    <CopyButton text={m.content} />
+                  )}
 
                   {m.citations && m.citations.length > 0 && (
                     <div className="flex flex-col gap-1.5">
@@ -224,6 +318,26 @@ export default function Home() {
               </div>
             );
           })}
+
+          {/* Follow-up suggestions after the latest answer */}
+          {!streaming &&
+            messages.length > 0 &&
+            messages[messages.length - 1].role === 'assistant' &&
+            messages[messages.length - 1].content &&
+            !messages[messages.length - 1].content.startsWith('⚠️') && (
+              <div className="flex flex-wrap gap-2 pl-11">
+                {followUps(messages[messages.length - 1].citations).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s)}
+                    className="max-w-xs truncate rounded-full border border-indigo-200 bg-indigo-50/50 px-3 py-1.5 text-xs text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20"
+                    title={s}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           <div ref={endRef} />
         </main>
 

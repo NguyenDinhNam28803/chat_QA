@@ -21,11 +21,13 @@ model Article {
   publishedAt DateTime?
   content     String
   contentHash String    @unique
+  topic       String?
   createdAt   DateTime  @default(now())
 
   chunks Chunk[]
 
   @@index([publishedAt])
+  @@index([topic])
 }
 
 model Chunk {

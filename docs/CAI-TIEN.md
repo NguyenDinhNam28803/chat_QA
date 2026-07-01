@@ -116,6 +116,35 @@ Sau CT-1, công tắc này không còn cần thiết để chat mượt, nhưng 
 
 ---
 
+## CT-12 · Phase 11 — Tính năng sản phẩm — 2026-06-30
+
+**A. Thẻ chủ đề + lọc lĩnh vực:** cột `Article.topic` (backfill 611 bài; Thể thao 216, Sức khỏe 120, Công nghệ 103…). `topic.classifier.ts` (luật từ khóa, 9 nhóm, có test). Gán khi ingest. `retrieval.search(q, k, topic?)` lọc theo topic; truyền qua `/chat/stream?...&topic=`. UI có hàng chip lọc lĩnh vực trên khung chat.
+
+**B. Copy + gợi ý câu hỏi (thuần FE):** nút "⧉ Chép" mỗi câu trả lời; sau khi trả lời hiện 2-3 chip gợi ý suy ra từ citations ("Tóm tắt bài: …") — bấm gửi như câu hỏi mới, không tốn LLM.
+
+**C. Thư viện bài + tìm kiếm:** `ArticlesModule` (`GET /articles?q=&topic=&page=`, `/articles/topics`, `/articles/:id`) dùng full-text `Article.contentTsv` (GIN). Trang `/articles` (tìm + chip topic + phân trang) + trang chi tiết `/articles/[id]` (toàn văn + link gốc). Link điều hướng từ chat.
+
+**Verify:** Jest 14/14, lint sạch 2 project, typecheck web 0, endpoints + lọc topic hoạt động (the-thao→chỉ thể thao, kinh-te→chỉ kinh tế), cả 2 trang render 200. SQL ở `server/prisma/sql/2026-06-30-phase11-topics.sql`.
+
+## CT-9 · Phase 8 — Chất lượng retrieval — 2026-06-30
+
+- **Hybrid search**: kết hợp vector (`<=>`) + full-text (`tsvector` config `simple`) bằng **Reciprocal Rank Fusion** (k=60, pool 20 mỗi bên). Bắt được tên riêng/số liệu mà vector hay trượt.
+- **Recency boost**: cộng điểm nhỏ (hệ số 0.005, phân rã 7 ngày) → tin mới thắng khi độ liên quan tương đương, nhưng KHÔNG lấn át relevance.
+- **Index**: `contentTsv` (GIN) + **HNSW** (vector_cosine_ops) — SQL ở `server/prisma/sql/2026-06-30-phase8-hybrid.sql`.
+- **Chunking theo câu** (`chunk.service.ts`): gom trọn câu tới ~400 token, câu quá dài fallback cắt theo từ. Không cắt giữa câu → embed chuẩn hơn.
+
+## CT-10 · Phase 9 — UX & độ tin cậy — 2026-06-30
+
+- **Markdown rendering** (`react-markdown` + renderer Tailwind trong `page.tsx`): `**đậm**`, danh sách, link… hiển thị đẹp thay vì ký tự thô.
+- **Hiện lỗi LLM** (`useChatStream.ts`): khi stream fail và chưa có token nào → hiện "⚠️ Không nhận được phản hồi…" thay vì bong bóng rỗng.
+
+## CT-11 · Phase 10 — Bền vững & vận hành — 2026-06-30
+
+- **`/health`**: kiểm tra Postgres + 2 Ollama, trả `status ok/degraded` + uptime.
+- **Integration tests**: `chat.service.spec.ts` (orchestration: token→done→lưu 2 message) + `ingestion.service.spec.ts` (dedup url/hash). Mock cuid2 & content-extractor để né ESM. **Jest 9/9 pass**.
+- **CI** (`.github/workflows/ci.yml`): backend lint/test/build + web lint/typecheck/build (không cần infra vì test đã mock).
+- **Dockerize**: `server/Dockerfile` + `web/Dockerfile` (multi-stage) + `.dockerignore`; services `backend`/`frontend` trong compose dưới **profile `app`** (mặc định `up` vẫn chỉ infra; `--profile app up --build` chạy cả app). Cả 2 image đã build thành công.
+
 ## CT-7 · Mở rộng nguồn tin (3 feed) — 2026-06-28
 
 **Thay đổi:** `server/src/ingestion/feeds.config.ts` từ 1 feed → **3 feed**: VnExpress, Tuổi Trẻ, Thanh Niên (đều "tin mới nhất").
