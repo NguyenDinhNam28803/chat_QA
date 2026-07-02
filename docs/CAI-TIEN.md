@@ -116,7 +116,25 @@ Sau CT-1, công tắc này không còn cần thiết để chat mượt, nhưng 
 
 ---
 
-## CT-21 · Sửa chart lượng bài + thêm quả địa cầu (cobe) — 2026-07-01
+## CT-23 · Nhóm A (Sự kiện + Đồng thuận/Mâu thuẫn) + Trang chủ — 2026-07-02
+
+Chuyển từ "feed phẳng" sang **news intelligence event-centric** — điểm khác biệt so với aggregator.
+- **Schema:** bảng `Event` (title, topic, summary, articleCount, sourceCount, firstSeen/lastSeen, hotness) + `Article.eventId` (FK SetNull).
+- **Gom cụm sự kiện** (`EventsService.cluster`): lấy bài 4 ngày gần nhất + embedding đại diện (chunk ord0), gom bằng **cosine trong JS** (threshold 0.72, greedy), tạo Event + gán eventId, xoá event mồ côi. 600 bài → 457 cụm, **24 sự kiện đa nguồn** (đúng thực tế: áp thấp Biển Đông 3 báo/9 bài…). `hotness = sourceCount*3 + articleCount + recencyBonus` (guard NaN).
+- **Đồng thuận/Mâu thuẫn** (`getEvent`): LLM phân tích **Tóm tắt + Điểm đồng thuận + Khác biệt/lưu ý** từ các bài đa nguồn, **cache trong Event.summary**. `eventAnalysisPrompt`.
+- **Endpoints:** `GET /events` (đa nguồn, xếp theo hotness), `GET /events/:id`, `POST /events/cluster`. Module `EventsModule` (import LlmModule).
+- **Trang chủ (`/`):** bố cục kiểu **trang sự kiện** (theo designdotmd.directory, mục "event"): **hero headliner** (sự kiện nóng nhất, tiêu đề lớn 3.4rem, badge "Đang nóng") → **lưới sự kiện** (lineup, thẻ "N báo") → **dòng tin mới** dạng agenda (giờ · tiêu đề · nguồn). Giữ bộ nhận diện Robotics Lab.
+- **Trang chủ — Điểm nóng động (carousel):** hero tự xoay vòng 5 tin nóng (5s/lần, lặp), nút ‹ ›, chấm điều hướng, **dừng khi hover**, hiệu ứng `slide-fade`.
+- **Trang chủ — gói "Sinh động":** thanh **breaking** chạy ngang (marquee, dừng khi hover), **dải số liệu đếm tăng** (CountUp rAF), **thanh tiến trình** carousel, **card fade-in so le** (animation-delay), **thời gian tương đối** ("3 giờ trước").
+- **Trang chủ — gói "Giàu thông tin":** `listEvents` bổ sung `sources[]` + `times[]` (từ quan hệ `articles`); FE thêm **SourceStack** (avatar chữ tắt nguồn xếp chồng, gộp theo tên báo, +N), **Sparkline** (SVG bar nhịp bài theo thời gian), **chip từ khóa nổi** từ `/insights` → `/timeline?q=`. **Chat chuyển sang `/chat`** (copy + sửa path). Trang `/events/[id]` (phân tích AI + timeline đa nguồn). `Nav` thêm Trang chủ + Chat; back-link "← Chat"→"← Trang chủ".
+- **Lưu ý:** clustering chạy thủ công `POST /events/cluster` (chưa cron); nên thêm vào scheduler để "live". listEvents chưa trả field hotness (UI không cần).
+- **Verify:** BE build+lint+test 14/14; web typecheck+lint 0; Docker rebuild; cluster 600→457, event detail phân tích 3 báo OK; 7 trang render 200.
+
+## CT-22 · Gỡ bỏ quả địa cầu — 2026-07-01
+
+Theo yêu cầu (không cần thiết): xóa `components/Globe.tsx`, gỡ import ở dashboard, **gỡ dependency `cobe`**. Biểu đồ "Lượng bài nạp" chuyển full-width thế chỗ. (Phần sửa chart ở CT-21 vẫn giữ.) typecheck/lint 0, Docker rebuild, /dashboard 200.
+
+## CT-21 · Sửa chart lượng bài + thêm quả địa cầu (cobe, ĐÃ GỠ ở CT-22) — 2026-07-01
 
 - **Fix chart "Lượng bài nạp":** bug — cột `<div style height:%>` có phần tử cha (flex-col) KHÔNG có chiều cao xác định → % không tính được → bar collapse. Sửa: bọc bar trong `<div className="relative flex-1">` (flex-1 trong cột `h-52` = chiều cao xác định) rồi bar `absolute bottom-0 h-[pct%]`, `Math.max(pct,3)` để cột nhỏ vẫn thấy; thêm nhãn số (luôn hiện) trên + ngày dưới.
 - **Quả địa cầu:** `components/Globe.tsx` dùng **cobe** (đã cài 2.0.1). Dynamic-import cobe TRONG useEffect (WebGL client-only, né SSR). Marker: Việt Nam + Washington/London/Bắc Kinh/Tokyo/Paris. `onRender` tự xoay. Panel "Phủ sóng tin tức" cạnh chart (grid 3 cột: globe 1 + chart 2). **Màu:** ban đầu `dark:0` + đất xám nhạt trên thẻ TRẮNG → tàng hình; sửa thành **`dark:1` (cầu tối) + chấm sáng 0.92 + marker cam + mapBrightness 5.2** để nổi trên nền trắng lab.

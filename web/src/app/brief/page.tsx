@@ -35,7 +35,7 @@ export default function BriefPage() {
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3">
-          <Link href="/" className="font-display text-sm font-bold">← Chat</Link>
+          <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
           <Nav current="/brief" />
         </div>

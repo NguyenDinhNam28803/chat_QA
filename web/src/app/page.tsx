@@ -1,387 +1,464 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import ReactMarkdown, { type Components } from 'react-markdown';
-import { useChatStream, type Citation } from '../lib/useChatStream';
 import { Nav } from '../components/Nav';
+import { Skeleton } from '../components/ui';
 
-// Markdown — flat, Inter body. Links stay fg (accent reserved for the one action).
-const md: Components = {
-  p: ({ children }) => <p className="mb-2 whitespace-pre-wrap last:mb-0">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold text-fg">{children}</strong>,
-  em: ({ children }) => <em className="italic">{children}</em>,
-  ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
-  ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
-  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-black/30 underline-offset-2 hover:decoration-accent">
-      {children}
-    </a>
-  ),
-  h1: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
-  h2: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
-  h3: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
-  code: ({ children }) => <code className="bg-black/5 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
+const API = process.env.NEXT_PUBLIC_API_URL;
+
+const TOPIC_LABELS: Record<string, string> = {
+  'the-thao': 'Thể thao',
+  'suc-khoe': 'Sức khỏe',
+  'giai-tri': 'Giải trí',
+  'giao-duc': 'Giáo dục',
+  'cong-nghe': 'Công nghệ',
+  'kinh-te': 'Kinh tế',
+  'phap-luat': 'Pháp luật',
+  'the-gioi': 'Thế giới',
+  khac: 'Khác',
 };
 
-const EXAMPLES = [
-  'Vietnam Airlines đặt mục tiêu lợi nhuận bao nhiêu năm nay?',
-  'Có tin gì mới về kinh tế Việt Nam?',
-  'Tóm tắt một tin đáng chú ý hôm nay.',
-];
+interface EventItem {
+  id: string;
+  title: string;
+  topic: string | null;
+  articleCount: number;
+  sourceCount: number;
+  lastSeen: string | null;
+  sources: string[];
+  times: string[];
+}
+interface ArticleRow {
+  id: string;
+  title: string;
+  source: string;
+  topic: string | null;
+  publishedAt: string | null;
+  snippet: string;
+}
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+// Relative time: "vừa xong", "12 phút trước", "3 giờ trước", "2 ngày trước"
+const rel = (d: string | null) => {
+  if (!d) return '';
+  const t = new Date(d).getTime();
+  if (!Number.isFinite(t)) return '';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return 'vừa xong';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} phút trước`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} giờ trước`;
+  const day = Math.floor(h / 24);
+  if (day < 7) return `${day} ngày trước`;
+  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+};
+const label = (t: string | null) => (t ? (TOPIC_LABELS[t] ?? t) : '');
+
+// Count-up animation for the stat band
+function CountUp({ value }: { value: number }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (value <= 0) return;
+    const dur = 900;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setN(Math.round(value * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{n.toLocaleString('vi-VN')}</>;
+}
+
+// Publication name only, dropping the section, e.g. "VietNamNet - Thời sự" → "VietNamNet"
+const pubName = (s: string) => s.split(/\s*[-–|]\s*/)[0].trim();
+// De-duplicate sources down to distinct publications, keeping order.
+const pubs = (sources: string[]) => Array.from(new Set(sources.map(pubName)));
+// Short initials, e.g. "Tuổi Trẻ" → "TT", "VnExpress" → "VN"
+const initials = (s: string) => {
+  const words = s.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
+};
+
+// Stacked source badges (who is covering the event)
+function SourceStack({ sources }: { sources: string[] }) {
+  const names = pubs(sources);
+  if (!names.length) return null;
+  const show = names.slice(0, 4);
+  const extra = names.length - show.length;
   return (
-    <button
-      onClick={() => {
-        void navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-      className="label hover:text-fg"
-      title="Sao chép"
-    >
-      {copied ? '✓ ĐÃ CHÉP' : '⧉ CHÉP'}
-    </button>
+    <div className="flex -space-x-1.5" title={names.join(' · ')}>
+      {show.map((s) => (
+        <span
+          key={s}
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-black/10 bg-bg font-mono text-[0.58rem] font-bold text-fg"
+        >
+          {initials(s)}
+        </span>
+      ))}
+      {extra > 0 && (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-black/10 bg-fg font-mono text-[0.58rem] font-bold text-bg">
+          +{extra}
+        </span>
+      )}
+    </div>
   );
 }
 
-function followUps(citations?: Citation[]): string[] {
-  const s = (citations ?? []).slice(0, 2).map((c) => `Tóm tắt bài: ${c.title}`);
-  s.push('Còn tin nào liên quan không?');
-  return s;
+// Article-rhythm sparkline: bars = article volume across the event's lifespan
+function Sparkline({ times, className = '' }: { times: string[]; className?: string }) {
+  const ts = times
+    .map((t) => new Date(t).getTime())
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  if (ts.length === 0) return null;
+  const bins = 14;
+  const min = ts[0];
+  const span = Math.max(1, ts[ts.length - 1] - min);
+  const counts = new Array<number>(bins).fill(0);
+  for (const t of ts) {
+    counts[Math.min(bins - 1, Math.floor(((t - min) / span) * bins))]++;
+  }
+  const maxC = Math.max(...counts, 1);
+  const bw = 4;
+  return (
+    <svg
+      viewBox={`0 0 ${bins * bw} 20`}
+      preserveAspectRatio="none"
+      className={`text-accent ${className}`}
+      aria-hidden
+    >
+      {counts.map((c, i) => {
+        const h = c ? Math.max((c / maxC) * 20, 2) : 0;
+        return (
+          <rect
+            key={i}
+            x={i * bw}
+            y={20 - h}
+            width={bw - 1.2}
+            height={h}
+            className="fill-current"
+            opacity={c ? 0.4 + 0.6 * (c / maxC) : 0}
+          />
+        );
+      })}
+    </svg>
+  );
 }
 
 export default function Home() {
-  const {
-    messages,
-    conversations,
-    conversationId,
-    streaming,
-    phase,
-    topics,
-    topic,
-    setTopic,
-    send,
-    stop,
-    sendFeedback,
-    loadConversation,
-    newConversation,
-  } = useChatStream();
-  const [input, setInput] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const [events, setEvents] = useState<EventItem[] | null>(null);
+  const [latest, setLatest] = useState<ArticleRow[] | null>(null);
+  const [stats, setStats] = useState<{ totalArticles: number; topics: number; sources: number } | null>(null);
+  const [trending, setTrending] = useState<{ term: string; c: number }[]>([]);
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    void (async () => {
+      try {
+        const [e, a, s, i] = await Promise.all([
+          fetch(`${API}/events`),
+          fetch(`${API}/articles`),
+          fetch(`${API}/articles/stats`),
+          fetch(`${API}/insights`),
+        ]);
+        if (e.ok) setEvents(await e.json());
+        if (a.ok) {
+          const r = (await a.json()) as { items: ArticleRow[] };
+          setLatest(r.items.slice(0, 12));
+        }
+        if (s.ok && i.ok) {
+          const st = (await s.json()) as { totalArticles: number; byTopic: unknown[] };
+          const ins = (await i.json()) as {
+            sources: unknown[];
+            trending: { term: string; c: number }[];
+          };
+          setStats({
+            totalArticles: st.totalArticles,
+            topics: st.byTopic.length,
+            sources: ins.sources.length,
+          });
+          setTrending(ins.trending?.slice(0, 12) ?? []);
+        }
+      } catch {
+        setEvents([]);
+        setLatest([]);
+      }
+    })();
+  }, []);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    send(input);
-    setInput('');
-  }
+  const hot = events ? events.slice(0, 5) : [];
+  const rest = events ? events.slice(5, 11) : [];
+
+  // Auto-rotate the hot-events carousel (loops), pause on hover.
+  useEffect(() => {
+    if (hot.length <= 1 || paused) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % hot.length), 5000);
+    return () => clearInterval(t);
+  }, [hot.length, paused]);
+
+  const cur = hot.length ? hot[idx % hot.length] : null;
+  const prev = () => setIdx((i) => (i - 1 + hot.length) % hot.length);
+  const next = () => setIdx((i) => (i + 1) % hot.length);
 
   return (
-    <div className="flex h-dvh bg-bg text-fg">
-      {/* ---------- Sidebar ---------- */}
-      <aside
-        className={`${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-black/10 bg-bg transition-transform md:relative md:translate-x-0`}
-      >
-        <div className="flex items-center gap-2.5 border-b border-black/10 px-4 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-sm font-black text-on-accent">
-            Đ
+    <div className="min-h-dvh bg-bg text-fg">
+      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-xs font-black text-on-accent">
+              Đ
+            </div>
+            <span className="font-display text-sm font-extrabold tracking-tight">ĐIỂM TIN AI</span>
           </div>
-          <span className="font-display text-sm font-extrabold tracking-tight">ĐIỂM TIN AI</span>
+          <div className="flex-1" />
+          <Nav current="/" />
         </div>
+      </header>
 
-        <div className="p-3">
-          <button
-            onClick={() => {
-              newConversation();
-              setSidebarOpen(false);
-            }}
-            disabled={streaming}
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-black/15 px-3 py-2.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-40"
-          >
-            + Cuộc trò chuyện mới
-          </button>
+      {/* ===== Breaking-news ticker ===== */}
+      {latest && latest.length > 0 && (
+        <div className="border-b border-black/10 bg-surface">
+          <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4">
+            <span className="label flex shrink-0 items-center gap-1.5 py-2.5 text-accent">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+              Mới nhất
+            </span>
+            <div className="marquee-wrap min-w-0 flex-1 overflow-hidden">
+              <div className="marquee flex w-max gap-10 whitespace-nowrap py-2.5">
+                {[...latest, ...latest].map((a, i) => (
+                  <Link
+                    key={`${a.id}-${i}`}
+                    href={`/articles/${a.id}`}
+                    className="text-sm text-muted transition hover:text-accent"
+                  >
+                    <span className="mr-2 text-accent">•</span>
+                    {a.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-
-        <p className="label px-4 pb-1 pt-2">Lịch sử</p>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-          {conversations.length === 0 && (
-            <p className="px-1 py-2 text-sm text-muted">Chưa có hội thoại nào.</p>
-          )}
-          {conversations.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => {
-                void loadConversation(c.id);
-                setSidebarOpen(false);
-              }}
-              className={`block w-full truncate border-l-2 py-1.5 pl-2 pr-1 text-left text-sm transition ${
-                c.id === conversationId
-                  ? 'border-accent font-medium text-fg'
-                  : 'border-transparent text-muted hover:border-black/20 hover:text-fg'
-              }`}
-              title={c.title ?? 'Hội thoại'}
-            >
-              {c.title ?? 'Hội thoại không tiêu đề'}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-20 bg-black/60 md:hidden" />
       )}
 
-      {/* ---------- Main ---------- */}
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-black/10 bg-bg/90 px-4 py-3 backdrop-blur">
-          <button onClick={() => setSidebarOpen(true)} className="border border-black/15 px-2 py-1 text-xs md:hidden" aria-label="Mở lịch sử">
-            ☰
-          </button>
-          <div className="flex-1">
-            <h1 className="font-display text-[15px] font-bold leading-tight tracking-tight">
-              Hỏi-đáp tin tức tiếng Việt
-            </h1>
-            <p className="label mt-0.5">Trả lời dựa trên tin đã nạp · kèm nguồn</p>
-          </div>
-          <Nav current="/" />
-        </header>
-
-        {topics.length > 0 && (
-          <div className="border-b border-black/10 bg-surface px-4 py-2">
-            <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-1.5">
-              <span className="label mr-1">Lĩnh vực</span>
-              <button
-                onClick={() => setTopic(undefined)}
-                className={`rounded-md border px-2 py-0.5 text-xs transition ${
-                  !topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
-                }`}
-              >
-                Tất cả
-              </button>
-              {topics.map((t) => (
-                <button
-                  key={t.topic}
-                  onClick={() => setTopic(topic === t.topic ? undefined : t.topic)}
-                  className={`rounded-md border px-2 py-0.5 text-xs transition ${
-                    topic === t.topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+        {/* ===== Stat band (count-up) ===== */}
+        {stats && (
+          <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-black/10 bg-black/10 sm:grid-cols-4">
+            {[
+              { v: stats.totalArticles, l: 'Bài đã nạp' },
+              { v: events ? events.length : 0, l: 'Sự kiện nóng' },
+              { v: stats.topics, l: 'Lĩnh vực' },
+              { v: stats.sources, l: 'Nguồn tin' },
+            ].map((k) => (
+              <div key={k.l} className="bg-surface px-4 py-3">
+                <div className="font-display text-2xl font-black tabular-nums leading-none">
+                  <CountUp value={k.v} />
+                </div>
+                <div className="label mt-1.5">{k.l}</div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Messages */}
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 overflow-y-auto px-4 py-6">
-          {messages.length === 0 && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-6 py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-md bg-accent text-2xl font-black text-on-accent">
-                Đ
-              </div>
-              <div className="space-y-2">
-                <h2 className="font-display text-3xl font-extrabold tracking-tight">
-                  Hỏi bất cứ điều gì về tin tức
-                </h2>
-                <p className="mx-auto max-w-md text-sm text-muted">
-                  Câu trả lời được tổng hợp từ các bài báo đã nạp và luôn kèm
-                  trích dẫn nguồn để bạn kiểm chứng.
+        {/* ===== Trending keyword chips ===== */}
+        {trending.length > 0 && (
+          <div className="mb-6 flex flex-wrap items-center gap-1.5">
+            <span className="label mr-1 text-accent">🔥 Từ khóa nổi</span>
+            {trending.map((t) => (
+              <Link
+                key={t.term}
+                href={`/timeline?q=${encodeURIComponent(t.term)}`}
+                title={`${t.c} lần · xem dòng thời gian`}
+                className="rounded-full border border-black/15 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-accent"
+              >
+                {t.term}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        <p className="label mb-3">🔴 Điểm nóng · sự kiện nhiều báo cùng đưa</p>
+
+        {/* ===== HERO — hot-events carousel (auto-rotate, loops) ===== */}
+        {!events ? (
+          <Skeleton className="h-56 w-full" />
+        ) : !cur ? (
+          <div className="rounded-lg border border-black/10 bg-surface p-6 text-sm text-muted">
+            Chưa có sự kiện đa nguồn. (Chạy gom cụm: POST /events/cluster)
+          </div>
+        ) : (
+          <div
+            className="relative rounded-lg border-2 border-fg bg-surface"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+          >
+            <Link
+              href={`/events/${cur.id}`}
+              className="group block px-6 py-8 md:px-14 md:py-12"
+            >
+              <div key={cur.id} className="slide-fade">
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-1.5 rounded-md bg-accent px-2 py-0.5 font-mono text-[0.7rem] font-bold uppercase tracking-wide text-on-accent">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-on-accent" />
+                    Đang nóng
+                  </span>
+                  <span className="label border border-black/20 px-2 py-0.5 text-fg">
+                    {cur.sourceCount} báo · {cur.articleCount} bài
+                  </span>
+                  {cur.topic && (
+                    <span className="label border border-black/15 px-2 py-0.5 text-fg">
+                      {label(cur.topic)}
+                    </span>
+                  )}
+                  <span className="label ml-auto">{rel(cur.lastSeen)}</span>
+                </div>
+                <h1 className="max-w-4xl font-display text-[2.2rem] font-extrabold leading-[1.05] tracking-tight transition group-hover:text-accent md:text-[3.2rem]">
+                  {cur.title}
+                </h1>
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <SourceStack sources={cur.sources} />
+                  <span className="label text-muted">
+                    {pubs(cur.sources).slice(0, 3).join(' · ')}
+                    {pubs(cur.sources).length > 3 ? ` +${pubs(cur.sources).length - 3}` : ''}
+                  </span>
+                  {cur.times.length > 1 && (
+                    <Sparkline times={cur.times} className="ml-auto h-6 w-24 opacity-80" />
+                  )}
+                </div>
+                <p className="mt-4 font-mono text-sm text-muted">
+                  Xem phân tích đồng thuận &amp; đối chiếu giữa các nguồn →
                 </p>
               </div>
-              <div className="flex flex-col items-stretch gap-2">
-                {EXAMPLES.map((ex) => (
-                  <button
-                    key={ex}
-                    onClick={() => send(ex)}
-                    className="border border-black/12 bg-surface px-3.5 py-2 text-left text-sm text-muted transition hover:border-accent hover:text-fg"
-                  >
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            </Link>
 
-          {messages.map((m, i) => {
-            const isUser = m.role === 'user';
-            const isEmptyStreaming =
-              !isUser && m.content === '' && streaming && i === messages.length - 1;
-            return (
-              <div key={i} className={`msg-in flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div
-                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-bold ${
-                    isUser ? 'border border-black/20 text-fg' : 'bg-fg text-bg'
-                  }`}
-                >
-                  {isUser ? 'Bạn' : 'Đ'}
-                </div>
-
-                <div className={`flex max-w-[82%] flex-col gap-2 ${isUser ? 'items-end' : 'items-start'}`}>
+            {/* Controls */}
+            {hot.length > 1 && (
+              <>
+                {/* Progress toward next slide */}
+                <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/5">
                   <div
-                    className={
-                      isUser
-                        ? 'rounded-md bg-fg px-4 py-2.5 leading-relaxed text-bg'
-                        : 'rounded-md border border-black/10 bg-surface px-4 py-3 leading-relaxed'
-                    }
-                  >
-                    {isUser ? (
-                      <p className="whitespace-pre-wrap">{m.content}</p>
-                    ) : (
-                      <div className="leading-relaxed">
-                        <ReactMarkdown components={md}>{m.content}</ReactMarkdown>
-                        {isEmptyStreaming && (
-                          <span className="inline-flex items-center gap-2 text-sm text-muted">
-                            <span className="caret text-accent">▍</span>
-                            {phase === 'retrieving' ? 'Đang tìm nguồn liên quan…' : 'Đang soạn câu trả lời…'}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {!isUser && m.content && !isEmptyStreaming && (
-                    <div className="flex items-center gap-2">
-                      <CopyButton text={m.content} />
-                      {m.id && (
-                        <>
-                          <button
-                            onClick={() => sendFeedback(m.id!, 1)}
-                            title="Hữu ích"
-                            className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
-                              m.feedback === 1 ? 'border-accent text-accent' : 'border-transparent text-muted hover:border-black/20'
-                            }`}
-                          >
-                            👍
-                          </button>
-                          <button
-                            onClick={() => sendFeedback(m.id!, -1)}
-                            title="Chưa tốt"
-                            className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
-                              m.feedback === -1 ? 'border-black/40 text-fg' : 'border-transparent text-muted hover:border-black/20'
-                            }`}
-                          >
-                            👎
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {m.citations && m.citations.length > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                      <p className="label">Nguồn trích dẫn</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {m.citations.map((c) => (
-                          <a
-                            key={c.index}
-                            href={c.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="group inline-flex max-w-xs items-center gap-1.5 border border-black/10 bg-surface px-2 py-1 text-xs text-muted transition hover:border-accent"
-                            title={`${c.title} — ${c.source}`}
-                          >
-                            <span className="flex h-4 w-4 shrink-0 items-center justify-center bg-fg text-[10px] font-bold text-bg">
-                              {c.index}
-                            </span>
-                            <span className="truncate font-medium text-fg">{c.title}</span>
-                            <span className="shrink-0">· {c.source}</span>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    key={idx}
+                    className="progress-bar h-full bg-accent"
+                    style={{ animationPlayState: paused ? 'paused' : 'running' }}
+                  />
                 </div>
-              </div>
-            );
-          })}
-
-          {(() => {
-            if (streaming || messages.length === 0) return null;
-            const last = messages[messages.length - 1];
-            if (last.role !== 'assistant' || !last.content) return null;
-            if (last.content.startsWith('⚠️')) return null;
-
-            if (last.content.includes('không tìm thấy')) {
-              return (
-                <div className="flex flex-wrap items-center gap-2 pl-11">
-                  <span className="label">Thử</span>
-                  {topic && (
-                    <button onClick={() => setTopic(undefined)} className="border border-black/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
-                      Bỏ lọc lĩnh vực
-                    </button>
-                  )}
-                  <Link href="/articles" className="border border-black/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
-                    Duyệt thư viện bài →
-                  </Link>
-                </div>
-              );
-            }
-
-            return (
-              <div className="flex flex-wrap gap-2 pl-11">
-                {followUps(last.citations).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => send(s)}
-                    className="max-w-xs truncate border border-black/12 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg"
-                    title={s}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
-          <div ref={endRef} />
-        </main>
-
-        {/* Composer */}
-        <div className="border-t border-black/10 bg-bg">
-          <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 py-3.5">
-            <div className="flex items-end gap-2 border border-black/15 bg-surface p-1.5 focus-within:border-accent">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Nhập câu hỏi về tin tức…"
-                className="flex-1 bg-transparent px-3 py-2 text-fg placeholder:text-muted outline-none"
-              />
-              {streaming ? (
                 <button
                   type="button"
-                  onClick={stop}
-                  aria-label="Dừng"
-                  title="Dừng tạo câu trả lời"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-black/20 text-fg"
+                  aria-label="Tin nóng trước"
+                  onClick={prev}
+                  className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
                 >
-                  <span className="h-3 w-3 bg-fg" />
+                  ‹
                 </button>
-              ) : (
                 <button
-                  type="submit"
-                  disabled={!input.trim()}
-                  aria-label="Gửi"
-                  className="flex h-10 shrink-0 items-center justify-center rounded-md bg-accent px-5 font-bold text-on-accent transition hover:brightness-95 disabled:opacity-40"
+                  type="button"
+                  aria-label="Tin nóng kế"
+                  onClick={next}
+                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
                 >
-                  GỬI
+                  ›
                 </button>
-              )}
+                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5">
+                  {hot.map((h, i) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      aria-label={`Tin nóng ${i + 1}`}
+                      onClick={() => setIdx(i)}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === idx % hot.length
+                          ? 'w-6 bg-accent'
+                          : 'w-1.5 bg-black/20 hover:bg-black/40'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ===== Lineup — event grid ===== */}
+        {rest.length > 0 && (
+          <>
+            <h2 className="mb-3 mt-10 font-display text-xl font-bold tracking-tight">
+              Các sự kiện khác
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {rest.map((e, i) => (
+                <Link
+                  key={e.id}
+                  href={`/events/${e.id}`}
+                  style={{ animationDelay: `${i * 70}ms` }}
+                  className="slide-fade group flex flex-col rounded-lg border border-black/10 bg-surface p-4 transition hover:border-accent"
+                >
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="rounded-md border border-accent/50 px-1.5 py-0.5 font-mono text-[0.65rem] font-semibold uppercase tracking-wide text-accent">
+                      {e.sourceCount} báo
+                    </span>
+                    {e.topic && (
+                      <span className="label border border-black/15 px-1.5 py-0.5 text-fg">
+                        {label(e.topic)}
+                      </span>
+                    )}
+                    <span className="label ml-auto">{rel(e.lastSeen)}</span>
+                  </div>
+                  <h3 className="flex-1 font-display font-bold leading-snug transition group-hover:text-accent">
+                    {e.title}
+                  </h3>
+                  <div className="mt-3 flex items-center gap-2">
+                    <SourceStack sources={e.sources} />
+                    {e.times.length > 1 && (
+                      <Sparkline times={e.times} className="ml-auto h-5 w-16 opacity-70" />
+                    )}
+                  </div>
+                  <p className="label mt-2">{e.articleCount} bài · đối chiếu →</p>
+                </Link>
+              ))}
             </div>
-            <p className="label mt-2 text-center">
-              Điểm Tin AI chỉ trả lời dựa trên tin đã nạp · có thể thiếu tin mới nhất
-            </p>
-          </form>
+          </>
+        )}
+
+        {/* ===== Agenda — latest news ticker ===== */}
+        <div className="mb-3 mt-12 flex items-baseline justify-between gap-3">
+          <h2 className="font-display text-xl font-bold tracking-tight">Dòng tin mới</h2>
+          <Link href="/articles" className="label text-muted transition hover:text-accent">
+            Xem thư viện →
+          </Link>
         </div>
-      </div>
+        {!latest ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
+          </div>
+        ) : (
+          <ul className="divide-y divide-black/10 border-y border-black/10">
+            {latest.map((a, i) => (
+              <li key={a.id} className="slide-fade" style={{ animationDelay: `${i * 45}ms` }}>
+                <Link
+                  href={`/articles/${a.id}`}
+                  className="group flex flex-col gap-1 py-3 sm:flex-row sm:items-baseline sm:gap-4"
+                >
+                  <span className="label w-28 shrink-0 tabular-nums">{rel(a.publishedAt)}</span>
+                  <span className="flex-1 font-medium leading-snug transition group-hover:text-accent">
+                    {a.title}
+                  </span>
+                  <span className="label shrink-0">
+                    {a.topic ? label(a.topic) + ' · ' : ''}{a.source}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </main>
     </div>
   );
 }

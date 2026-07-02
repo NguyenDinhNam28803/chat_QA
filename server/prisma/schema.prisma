@@ -23,12 +23,32 @@ model Article {
   contentHash String    @unique
   topic       String?
   summary     String?
+  eventId     String?
   createdAt   DateTime  @default(now())
 
   chunks Chunk[]
+  event  Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([publishedAt])
   @@index([topic])
+  @@index([eventId])
+}
+
+model Event {
+  id           String    @id @default(cuid())
+  title        String
+  topic        String?
+  summary      String? // AI consensus/conflict analysis (markdown), cached
+  articleCount Int       @default(0)
+  sourceCount  Int       @default(0)
+  firstSeen    DateTime?
+  lastSeen     DateTime?
+  hotness      Float     @default(0)
+  createdAt    DateTime  @default(now())
+
+  articles Article[]
+
+  @@index([hotness])
 }
 
 model DailyBrief {

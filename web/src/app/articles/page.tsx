@@ -83,7 +83,7 @@ export default function ArticlesPage() {
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3.5">
           <Link href="/" className="label border border-transparent px-2 py-1 hover:border-black/20 hover:text-fg">
-            ← Chat
+            ← Trang chủ
           </Link>
           <h1 className="flex-1 font-display text-[15px] font-bold tracking-tight">
             Thư viện · {data?.total ?? 0}

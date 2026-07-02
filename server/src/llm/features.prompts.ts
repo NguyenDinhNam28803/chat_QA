@@ -60,3 +60,20 @@ export function timelineNarrativePrompt(
     user: `CHỦ ĐỀ: ${query}\n\nDÒNG SỰ KIỆN (cũ → mới):\n${articlesBlock}`,
   };
 }
+
+export function eventAnalysisPrompt(
+  title: string,
+  articlesBlock: string,
+): { system: string; user: string } {
+  return {
+    system: [
+      'Bạn là biên tập viên phân tích tin tức tiếng Việt.',
+      'Dưới đây là các bài từ NHIỀU BÁO về cùng một sự kiện. CHỈ dựa trên nội dung được cung cấp, viết markdown gồm 3 mục:',
+      '**Tóm tắt** (2-3 câu về sự kiện).',
+      '**Điểm đồng thuận** (những điều các báo cùng nêu).',
+      '**Khác biệt & lưu ý** (điểm các báo nêu khác nhau, hoặc chi tiết chỉ 1 báo đề cập).',
+      'Trung lập, không thiên vị, không bịa thông tin ngoài các bài.',
+    ].join(' '),
+    user: `SỰ KIỆN: ${title}\n\nCÁC BÀI THEO NGUỒN:\n${articlesBlock}`,
+  };
+}

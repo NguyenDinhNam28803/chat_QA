@@ -93,3 +93,47 @@ body {
 .msg-in {
   animation: msg-in 0.2s ease-out both;
 }
+
+/* Hot-events carousel slide entrance */
+@keyframes slide-fade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.slide-fade {
+  animation: slide-fade 0.45s ease both;
+}
+
+/* Breaking-news ticker */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  animation: marquee 45s linear infinite;
+}
+.marquee-wrap:hover .marquee {
+  animation-play-state: paused;
+}
+
+/* Carousel progress bar (fills toward next slide) */
+@keyframes progress {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+.progress-bar {
+  animation: progress 5s linear both;
+}

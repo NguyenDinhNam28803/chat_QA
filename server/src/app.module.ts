@@ -10,6 +10,7 @@ import { LlmModule } from './llm/llm.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthModule } from './health/health.module';
 import { ArticlesModule } from './articles/articles.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ArticlesModule } from './articles/articles.module';
     ChatModule,
     HealthModule,
     ArticlesModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

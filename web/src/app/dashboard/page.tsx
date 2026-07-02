@@ -3,7 +3,6 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Nav } from '../../components/Nav';
 import { Skeleton } from '../../components/ui';
-import { Globe } from '../../components/Globe';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -54,7 +53,7 @@ export default function DashboardPage() {
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3">
-          <Link href="/" className="font-display text-sm font-bold">← Chat</Link>
+          <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
           <Nav current="/dashboard" />
         </div>
@@ -99,20 +98,11 @@ export default function DashboardPage() {
               <Kpi label="Tin nhắn" value={stats.totalMessages} />
             </div>
 
-            {/* Globe + ingest chart */}
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Panel title="Phủ sóng tin tức">
-                <Globe />
-                <p className="mt-1 text-center text-xs text-muted">
-                  Nguồn tin trong nước & quốc tế
-                </p>
-              </Panel>
-
-              <Panel
-                className="lg:col-span-2"
-                title="Lượng bài nạp · 14 ngày"
-                right={<span className="label">TB {avgDay}/ngày</span>}
-              >
+            {/* Ingest chart — full width */}
+            <Panel
+              title="Lượng bài nạp · 14 ngày"
+              right={<span className="label">TB {avgDay}/ngày</span>}
+            >
                 {ins && ins.perDay.length > 0 ? (
                   <div className="flex h-52 items-stretch gap-2">
                     {ins.perDay.map((d) => (
@@ -134,8 +124,7 @@ export default function DashboardPage() {
                 ) : (
                   <p className="text-sm text-muted">Chưa có dữ liệu.</p>
                 )}
-              </Panel>
-            </div>
+            </Panel>
 
             {/* Topic + trending + sources */}
             <div className="grid gap-4 lg:grid-cols-3">
