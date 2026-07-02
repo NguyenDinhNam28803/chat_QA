@@ -2,9 +2,14 @@
 
 > Tài liệu này đi qua TỪNG BƯỚC của hệ thống, kèm code thật ở mỗi mắt xích. Đọc cùng [ONBOARDING.md](ONBOARDING.md).
 >
-> Hệ thống có **2 pha tách biệt**:
+> Hệ thống gồm các pha:
 > - **PHA A — Nạp dữ liệu** (nền, định kỳ): biến tin tức thành vector lưu vào DB.
 > - **PHA B — Hỏi-đáp** (real-time): tìm vector liên quan → LLM trả lời kèm trích dẫn.
+> - **PHA C — Tính năng AI** (5 trụ): tóm tắt, bản tin ngày, dòng thời gian, đối chiếu, insight — sinh single-shot + cache.
+> - **PHA D — Trí tuệ sự kiện**: gom bài đa nguồn thành sự kiện + phân tích đồng thuận/mâu thuẫn.
+> - **PHA E — Lưu trữ theo quý & Nhìn lại**: tổng kết điểm nóng theo quý/năm.
+>
+> PHA A–B là lõi RAG; C–D–E là các lớp "news intelligence" thêm sau (xem [CAI-TIEN.md](CAI-TIEN.md)).
 
 ---
 
@@ -425,6 +430,167 @@ function send(q: string) {
 
 ---
 
+# PHA C — TÍNH NĂNG AI (5 trụ nội dung)
+
+Các trụ dùng chung **một hàm sinh single-shot** `LlmService.generate()` (tách từ `streamMessages`, cùng cơ chế fallback + timeout 60s như chat) và **cache kết quả** để né rate-limit free-tier OpenRouter.
+
+```ts
+/** Single-shot generation (dùng cho summary / brief / compare / timeline / recap). */
+async generate(systemText: string, userText: string): Promise<string> {
+  let out = '';
+  for await (const t of this.streamMessages([
+    new SystemMessage(systemText),
+    new HumanMessage(userText),
+  ])) out += t;
+  return out;
+}
+```
+
+**C1 — Tóm tắt bài** (`getSummary`): cache trong `Article.summary`, chỉ gọi LLM khi chưa có.
+
+```ts
+if (a.summary) return { summary: a.summary, cached: true };      // dùng lại cache
+const { system, user } = summarizeArticlePrompt(a.title, a.content);
+const summary = (await this.llm.generate(system, user)).trim();
+await this.prisma.article.update({ where: { id }, data: { summary } });
+```
+
+**C2 — Bản tin ngày** (`dailyBrief`): cache theo NGÀY trong bảng `DailyBrief`; gom 24 tin mới nhất theo lĩnh vực rồi để LLM viết bản tin nhanh.
+
+**C3 — Dòng thời gian & Đối chiếu** (`timeline`, `compare`): full-text search (`contentTsv @@ plainto_tsquery`) → xếp theo `publishedAt` (timeline) hoặc nhóm theo nguồn (compare) → LLM viết narrative/so sánh. Narrative là **tùy chọn** (LLM lỗi vẫn trả data).
+
+**C4 — Insight** (`insights`): **THUẦN SQL, KHÔNG LLM** — lượng bài/ngày (14 ngày), top nguồn, từ khóa nổi (đếm term trong tiêu đề 3 ngày, lọc stopword tiếng Việt).
+
+```ts
+// từ khóa nổi: tách token tiêu đề, bỏ stopword/só, đếm tần suất, lấy top 18
+for (const raw of title.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
+  const w = raw.trim();
+  if (w.length < 3 || STOPWORDS.has(w) || /^\d+$/.test(w)) continue;
+  freq.set(w, (freq.get(w) ?? 0) + 1);
+}
+```
+
+> Endpoints: `GET /articles/:id/summary`, `GET /brief`, `GET /timeline?q=`, `GET /compare?q=`, `GET /insights`. Prompt ở `llm/features.prompts.ts`.
+
+---
+
+# PHA D — TRÍ TUỆ SỰ KIỆN (gom cụm + đồng thuận/mâu thuẫn)
+
+Điểm khác biệt so với aggregator: gom bài **cùng một sự kiện** từ nhiều báo rồi phân tích các báo **đồng thuận / mâu thuẫn** ra sao.
+
+## D1. Gom cụm (offline, KHÔNG LLM) — `events.service.ts` `cluster()`
+
+Lấy bài 4 ngày gần nhất + **vector đại diện** (chunk `ord=0`), gom tham lam theo cosine ≥ 0.72:
+
+```ts
+// vector đại diện của mỗi bài = embedding của chunk đầu tiên
+SELECT a."id", a."title", a."source", a."topic", a."publishedAt",
+       c."embedding"::text AS emb
+FROM "Article" a
+JOIN "Chunk" c ON c."articleId" = a."id" AND c."ord" = 0
+WHERE a."publishedAt" > now() - (${WINDOW_DAYS} || ' days')::interval
+ORDER BY a."publishedAt" DESC LIMIT ${MAX_ARTICLES}
+```
+
+```ts
+// greedy: mỗi bài chưa gán mở 1 cụm, hút mọi bài đủ gần
+for (let i = 0; i < n; i++) {
+  if (assigned[i]) continue;
+  const cluster = [i]; assigned[i] = true;
+  for (let j = i + 1; j < n; j++)
+    if (!assigned[j] && this.cosine(arts[i], arts[j]) >= SIM_THRESHOLD) {
+      cluster.push(j); assigned[j] = true;
+    }
+  clusters.push(cluster);
+}
+```
+
+Mỗi cụm → 1 row `Event` (title = bài mới nhất, `sourceCount`, `articleCount`, `firstSeen/lastSeen`) và gán `Article.eventId`. **Độ nóng**:
+
+```ts
+let hotness = sources.size * 3 + members.length + recencyBonus;   // + guard NaN
+```
+
+Kích hoạt: `POST /events/cluster` (thủ công; chưa có cron).
+
+## D2. Danh sách điểm nóng — `listEvents(limit, from?)`
+
+Lọc sự kiện đa nguồn (`sourceCount ≥ 2`), xếp theo `hotness`, kèm **danh sách nguồn** + **mốc thời gian bài** (cho sparkline + badge nguồn ở trang chủ):
+
+```ts
+sources: Array.from(new Set(articles.map((a) => a.source))),
+times: articles.filter((a) => a.publishedAt).map((a) => a.publishedAt.toISOString()),
+```
+
+`from` (ISO) giới hạn theo đầu quý — trang chủ chỉ hiện sự kiện của quý hiện tại.
+
+## D3. Đồng thuận / Mâu thuẫn — `getEvent(id)`
+
+Lần đầu mở sự kiện: LLM phân tích các bài đa nguồn → **Tóm tắt / Điểm đồng thuận / Khác biệt & lưu ý**, **cache trong `Event.summary`**:
+
+```ts
+if (!summary && event.sourceCount >= 2 && articles.length > 0) {
+  const block = articles.map((a) => `- [${a.source}] ${a.title}: ${a.content.slice(0, 220)}`).join('\n');
+  const { system, user } = eventAnalysisPrompt(event.title, block);
+  summary = (await this.llm.generate(system, user)).trim();
+  await this.prisma.event.update({ where: { id }, data: { summary } });
+}
+```
+
+```mermaid
+flowchart LR
+  Arts["Bài 4 ngày<br/>+ vector ord0"] --> Cos["cosine ≥ 0.72<br/>greedy cluster"]
+  Cos --> Ev[("Event<br/>sourceCount, hotness")]
+  Ev --> List["/events (điểm nóng)"]
+  Ev --> Det["/events/:id"]
+  Det --> LLM["LLM đồng thuận/mâu thuẫn<br/>→ cache Event.summary"]
+```
+
+---
+
+# PHA E — LƯU TRỮ THEO QUÝ & NHÌN LẠI
+
+Giữ TOÀN BỘ dữ liệu; trang chủ chỉ hiện **quý hiện tại**, các quý cũ vào trang **Nhìn lại** kèm tổng kết AI. `periods.service.ts`.
+
+## E1. Xác định quý & tự quản lý — `getActive()`
+
+```ts
+private quarterInfo(d: Date) {
+  const year = d.getFullYear();
+  const quarter = Math.floor(d.getMonth() / 3) + 1;      // 1..4
+  const startMonth = (quarter - 1) * 3;
+  const start = new Date(year, startMonth, 1);
+  const end = new Date(year, startMonth + 3, 1);         // exclusive
+  return { year, quarter, start, end, label: `Quý ${ROMAN[quarter]}/${year}` };
+}
+```
+
+`getActive()`: tự tạo quý hiện tại nếu chưa có, và **archive mọi quý active không phải quý này** (chỉ lưu counts, không gọi LLM).
+
+## E2. Thống kê LIVE — `computeStats(start, end)`
+
+Dữ liệu quá khứ đã "đóng băng" nên **tính trực tiếp theo khoảng ngày**, không cần đọc snapshot: đếm bài (`publishedAt` trong `[start,end)`), top 10 sự kiện nóng, phân bố lĩnh vực (`groupBy topic`).
+
+## E3. Recap quý & tổng kết năm
+
+- `getPeriod(id)`: quý **đã archive** & chưa có summary → LLM viết **Tổng quan / Điểm nóng chính / Xu hướng lĩnh vực** (`periodRecapPrompt`), cache vào `Period.summary`. Quý đang chạy → chú thích "đang diễn ra".
+- `yearReview(year)`: gộp recap các quý trong năm → LLM trả lời **"Năm ... là một năm như thế nào?"** (`yearReviewPrompt`), cache bảng `YearReview`.
+- `rollover()` (thủ công `POST /periods/rollover`): archive quý đã hết + sinh recap ngay.
+
+> Endpoints: `GET /periods/active`, `GET /periods`, `GET /periods/:id`, `GET /periods/year/:year`, `POST /periods/rollover`. **Hạn chế:** không backfill quá khứ (RSS chỉ có tin gần đây); rollover chưa có cron.
+
+---
+
+# TRANG CHỦ — tổng hợp trực quan (`web/src/app/page.tsx`)
+
+Client component gọi song song `/periods/active`, `/events?from=<đầu quý>`, `/articles`, `/articles/stats`, `/insights` rồi dựng:
+- **Banner "Tin tức được cập nhật từ ngày DD/MM/YYYY"** (lấy `startDate` quý active — để kiểm chứng mốc dữ liệu).
+- **Thanh breaking** (marquee tin mới) + **dải số liệu đếm tăng**.
+- **Carousel Điểm nóng** (tự xoay 5s, thanh tiến trình, badge nguồn xếp chồng + sparkline nhịp bài).
+- **Lưới sự kiện** + **chip từ khóa nổi** (→ `/timeline`) + **dòng tin mới** (agenda).
+
+---
+
 # Sơ đồ Mermaid
 
 ## PHA A — Pipeline nạp dữ liệu
@@ -610,6 +776,13 @@ useChatStream.send()
 | `llm/llm.service` | (B6) stream LLM + fallback |
 | `chat/chat.service` | (B2-B8) điều phối toàn bộ + lưu DB |
 | `chat/chat.controller` | (B1) endpoint SSE |
+| `llm/llm.service` (generate) | (C) sinh single-shot cho các trụ AI + recap |
+| `llm/features.prompts` | (C,D,E) prompt tóm tắt/brief/compare/timeline/sự kiện/recap/năm |
+| `articles/articles.service` | (C1-C4) summary, brief, timeline, compare, insights, stats |
+| `events/events.service` | (D1-D3) gom cụm sự kiện + điểm nóng + đồng thuận/mâu thuẫn |
+| `periods/periods.service` | (E1-E3) quản lý quý + recap quý + tổng kết năm |
 | `web/lib/useChatStream` | (B1,B6,B8) EventSource phía client |
-| `web/app/page.tsx` | render chat + citations |
+| `web/app/page.tsx` | (trang chủ) banner quý + carousel điểm nóng + số liệu |
+| `web/app/events/[id]` | render sự kiện: phân tích đa nguồn + timeline |
+| `web/app/review` + `review/[id]` | Nhìn lại: danh sách quý + recap quý/năm |
 ```
