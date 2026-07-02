@@ -58,6 +58,36 @@ model DailyBrief {
   createdAt DateTime @default(now())
 }
 
+// A calendar quarter of news. Data is never deleted; the homepage just shows
+// the active quarter, while archived quarters live in the "Nhìn lại" review.
+model Period {
+  id           String   @id @default(cuid())
+  kind         String   @default("quarter")
+  label        String // "Quý III/2026"
+  year         Int
+  quarter      Int // 1-4
+  startDate    DateTime
+  endDate      DateTime // exclusive
+  status       String   @default("active") // active | archived
+  summary      String? // AI recap (markdown), cached on archive/view
+  articleCount Int      @default(0)
+  eventCount   Int      @default(0)
+  topEvents    Json? // snapshot: top hot events of the quarter
+  byTopic      Json? // snapshot: topic distribution
+  createdAt    DateTime @default(now())
+
+  @@unique([year, quarter])
+  @@index([status])
+}
+
+// End-of-year synthesis across the year's quarters, cached.
+model YearReview {
+  id        String   @id @default(cuid())
+  year      Int      @unique
+  content   String
+  createdAt DateTime @default(now())
+}
+
 model Chunk {
   id         String   @id @default(cuid())
   articleId  String

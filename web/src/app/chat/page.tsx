@@ -157,7 +157,7 @@ export default function Home() {
 
         {topics.length > 0 && (
           <div className="border-b border-black/10 bg-surface px-4 py-2">
-            <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-1.5">
+            <div className="mx-auto flex w-full max-w-none flex-wrap items-center gap-1.5">
               <span className="label mr-1">Lĩnh vực</span>
               <button
                 onClick={() => setTopic(undefined)}
@@ -183,7 +183,7 @@ export default function Home() {
         )}
 
         {/* Messages */}
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 overflow-y-auto px-4 py-6">
+        <main className="mx-auto flex w-full max-w-none flex-1 flex-col gap-5 overflow-y-auto px-4 py-6">
           {messages.length === 0 && (
             <div className="flex flex-1 flex-col items-center justify-center gap-6 py-16 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-md bg-accent text-2xl font-black text-on-accent">
@@ -347,7 +347,7 @@ export default function Home() {
 
         {/* Composer */}
         <div className="border-t border-black/10 bg-bg">
-          <form onSubmit={submit} className="mx-auto w-full max-w-3xl px-4 py-3.5">
+          <form onSubmit={submit} className="mx-auto w-full max-w-none px-4 py-3.5">
             <div className="flex items-end gap-2 border border-black/15 bg-surface p-1.5 focus-within:border-accent">
               <input
                 value={input}

@@ -81,7 +81,7 @@ export default function ArticlesPage() {
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3.5">
+        <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3.5">
           <Link href="/" className="label border border-transparent px-2 py-1 hover:border-black/20 hover:text-fg">
             ← Trang chủ
           </Link>
@@ -92,7 +92,7 @@ export default function ArticlesPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl px-4 py-6">
+      <main className="mx-auto w-full max-w-none px-4 py-6">
         {/* Search — the single accent action on this screen */}
         <form
           onSubmit={(e) => {

@@ -98,14 +98,14 @@ export default function ArticleDetail() {
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-3.5">
+        <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3.5">
           <Link href="/articles" className="label border border-transparent px-2 py-1 hover:border-black/20 hover:text-fg">
             ← Thư viện
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl px-4 py-8">
+      <main className="mx-auto w-full max-w-none px-4 py-8">
         {loading && (
           <div>
             <Skeleton className="mb-3 h-5 w-20" />

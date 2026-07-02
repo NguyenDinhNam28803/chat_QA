@@ -48,14 +48,14 @@ export default function ComparePage() {
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-4xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
           <Nav current="/compare" />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl px-4 py-8">
+      <main className="mx-auto w-full max-w-none px-4 py-8">
         <p className="label mb-1">Đối chiếu AI</p>
         <h1 className="font-display text-[2.6rem] font-extrabold leading-none tracking-tight">
           Các báo đưa tin thế nào?

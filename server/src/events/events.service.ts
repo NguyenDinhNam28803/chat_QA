@@ -132,10 +132,13 @@ export class EventsService {
     return { events: clusters.length, articles: n };
   }
 
-  /** Hot multi-source events for the homepage. */
-  async listEvents(limit = 24) {
+  /** Hot multi-source events for the homepage (optionally within a period). */
+  async listEvents(limit = 24, from?: Date) {
     const events = await this.prisma.event.findMany({
-      where: { sourceCount: { gte: 2 } },
+      where: {
+        sourceCount: { gte: 2 },
+        ...(from ? { lastSeen: { gte: from } } : {}),
+      },
       orderBy: [{ hotness: 'desc' }, { lastSeen: 'desc' }],
       take: limit,
       select: {

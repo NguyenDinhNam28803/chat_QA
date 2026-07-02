@@ -52,14 +52,14 @@ export default function DashboardPage() {
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
           <Nav current="/dashboard" />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-6">
+      <main className="mx-auto w-full max-w-none px-4 py-6">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
             <p className="label mb-1">Bảng điều khiển</p>

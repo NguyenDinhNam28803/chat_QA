@@ -8,6 +8,7 @@ const LINKS = [
   { href: '/timeline', label: 'Dòng thời gian' },
   { href: '/compare', label: 'Đối chiếu' },
   { href: '/articles', label: 'Thư viện' },
+  { href: '/review', label: 'Nhìn lại' },
   { href: '/dashboard', label: 'Bảng tin' },
 ];
 

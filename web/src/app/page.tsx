@@ -53,6 +53,21 @@ const rel = (d: string | null) => {
   return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 };
 const label = (t: string | null) => (t ? (TOPIC_LABELS[t] ?? t) : '');
+const fmtDate = (d: string | null) =>
+  d
+    ? new Date(d).toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : '';
+
+interface PeriodActive {
+  label: string;
+  startDate: string;
+  articleCount: number;
+  eventCount: number;
+}
 
 // Count-up animation for the stat band
 function CountUp({ value }: { value: number }) {
@@ -156,14 +171,21 @@ export default function Home() {
   const [latest, setLatest] = useState<ArticleRow[] | null>(null);
   const [stats, setStats] = useState<{ totalArticles: number; topics: number; sources: number } | null>(null);
   const [trending, setTrending] = useState<{ term: string; c: number }[]>([]);
+  const [period, setPeriod] = useState<PeriodActive | null>(null);
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     void (async () => {
       try {
+        // Active quarter first — the homepage only shows this quarter's news.
+        const pRes = await fetch(`${API}/periods/active`);
+        const p: PeriodActive | null = pRes.ok ? await pRes.json() : null;
+        setPeriod(p);
+        const fromQ =
+          p?.startDate ? `?from=${encodeURIComponent(p.startDate)}` : '';
         const [e, a, s, i] = await Promise.all([
-          fetch(`${API}/events`),
+          fetch(`${API}/events${fromQ}`),
           fetch(`${API}/articles`),
           fetch(`${API}/articles/stats`),
           fetch(`${API}/insights`),
@@ -210,7 +232,7 @@ export default function Home() {
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-xs font-black text-on-accent">
               Đ
@@ -225,7 +247,7 @@ export default function Home() {
       {/* ===== Breaking-news ticker ===== */}
       {latest && latest.length > 0 && (
         <div className="border-b border-black/10 bg-surface">
-          <div className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4">
+          <div className="mx-auto flex w-full max-w-none items-center gap-4 px-4">
             <span className="label flex shrink-0 items-center gap-1.5 py-2.5 text-accent">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
               Mới nhất
@@ -248,7 +270,26 @@ export default function Home() {
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-8">
+      <main className="mx-auto w-full max-w-none px-4 py-8">
+        {/* ===== Period banner — "updated from" date for verification ===== */}
+        {period && (
+          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-black/10 bg-surface px-4 py-3">
+            <span className="label border border-accent/50 px-2 py-0.5 text-accent">
+              {period.label}
+            </span>
+            <span className="text-sm text-muted">
+              Tin tức được cập nhật từ ngày{' '}
+              <b className="font-semibold text-fg">{fmtDate(period.startDate)}</b>
+            </span>
+            <Link
+              href="/review"
+              className="label ml-auto text-muted transition hover:text-accent"
+            >
+              Nhìn lại các quý →
+            </Link>
+          </div>
+        )}
+
         {/* ===== Stat band (count-up) ===== */}
         {stats && (
           <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-black/10 bg-black/10 sm:grid-cols-4">

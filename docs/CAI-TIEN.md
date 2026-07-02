@@ -116,10 +116,21 @@ Sau CT-1, công tắc này không còn cần thiết để chat mượt, nhưng 
 
 ---
 
+## CT-24 · Lưu trữ tin theo quý + "Nhìn lại" (tổng kết quý/năm) — 2026-07-02
+
+Thêm chu kỳ **theo quý** (giữ toàn bộ dữ liệu, trang chủ chỉ hiện quý hiện tại) + tổng kết AI.
+- **Schema (raw SQL vào Postgres Docker + prisma generate):** bảng `Period` (kind, label "Quý III/2026", year, quarter, startDate, endDate exclusive, status active|archived, summary cache, articleCount, eventCount, topEvents/byTopic Json dự phòng, `@@unique([year,quarter])`) + `YearReview` (year @unique, content).
+- **`PeriodsService`:** `getActive()` tự tạo quý hiện tại + **archive quý cũ** (snapshot counts, không LLM); `computeStats(start,end)` tính LIVE (bài/sự kiện/topEvents top10/byTopic) — dữ liệu quá khứ đã "đóng băng" nên không cần đọc snapshot; `getPeriod(id)` sinh + cache **recap AI** cho quý đã lưu (`periodRecapPrompt`: Tổng quan / Điểm nóng chính / Xu hướng lĩnh vực); `rollover()` (thủ công) archive + sinh recap ngay; `yearReview(year)` gộp recap các quý → "Năm ... là một năm như thế nào?" (`yearReviewPrompt`, cache `YearReview`).
+- **Endpoints:** `GET /periods/active`, `GET /periods`, `GET /periods/:id`, `GET /periods/year/:year`, `POST /periods/rollover`. `GET /events?from=ISO` lọc sự kiện theo mốc đầu quý. Module `PeriodsModule` (import LlmModule) + đăng ký app.module.
+- **Trang chủ:** banner **"Tin tức được cập nhật từ ngày DD/MM/YYYY"** + nhãn quý (lấy `startDate` quý active) để kiểm chứng; sự kiện lọc theo `?from` = đầu quý.
+- **Trang `/review` (Nhìn lại):** nhóm quý theo năm, thẻ từng quý (khoảng ngày, số bài, sự kiện nóng, trạng thái) → `/review/[id]`; nút **"Năm vừa rồi thế nào?"** tải tổng kết năm inline. `/review/[id]`: recap AI + điểm nóng của quý + phân bố lĩnh vực. `Nav` thêm "Nhìn lại".
+- **Lưu ý:** recap quý & tổng kết năm **chỉ sinh cho quý đã archive**; quý đang chạy hiện chú thích "đang diễn ra". Rollover tự động chưa có cron → chạy thủ công `POST /periods/rollover` khi sang quý mới (hoặc thêm scheduler sau). Không backfill quá khứ (RSS chỉ có tin gần đây).
+- **Verify:** BE tsc+lint 0 · Docker rebuild BE+FE · `/periods/active` = Quý III/2026 từ 01/07/2026 (905 bài, 62 sự kiện) · `/periods/:id` trả topEvents 10 + byTopic 9 · `/`, `/review`, `/review/[id]` render 200.
+
 ## CT-23 · Nhóm A (Sự kiện + Đồng thuận/Mâu thuẫn) + Trang chủ — 2026-07-02
 
 Chuyển từ "feed phẳng" sang **news intelligence event-centric** — điểm khác biệt so với aggregator.
-- **Schema:** bảng `Event` (title, topic, summary, articleCount, sourceCount, firstSeen/lastSeen, hotness) + `Article.eventId` (FK SetNull).
+- **Schema:** bảng `Event` (title, topic, summary, articleCount, sourceCount, firstSeen/lastSeen, hotness) + `Article.eventId` (FK SetNull, `@@index`). **Áp bằng raw SQL trực tiếp vào Postgres Docker đang chạy** (CREATE TABLE + ALTER TABLE ADD COLUMN + FK + index) thay vì `prisma migrate` để không phải reset dev DB; sau đó `prisma generate` để client có model `Event`.
 - **Gom cụm sự kiện** (`EventsService.cluster`): lấy bài 4 ngày gần nhất + embedding đại diện (chunk ord0), gom bằng **cosine trong JS** (threshold 0.72, greedy), tạo Event + gán eventId, xoá event mồ côi. 600 bài → 457 cụm, **24 sự kiện đa nguồn** (đúng thực tế: áp thấp Biển Đông 3 báo/9 bài…). `hotness = sourceCount*3 + articleCount + recencyBonus` (guard NaN).
 - **Đồng thuận/Mâu thuẫn** (`getEvent`): LLM phân tích **Tóm tắt + Điểm đồng thuận + Khác biệt/lưu ý** từ các bài đa nguồn, **cache trong Event.summary**. `eventAnalysisPrompt`.
 - **Endpoints:** `GET /events` (đa nguồn, xếp theo hotness), `GET /events/:id`, `POST /events/cluster`. Module `EventsModule` (import LlmModule).
@@ -127,8 +138,8 @@ Chuyển từ "feed phẳng" sang **news intelligence event-centric** — điể
 - **Trang chủ — Điểm nóng động (carousel):** hero tự xoay vòng 5 tin nóng (5s/lần, lặp), nút ‹ ›, chấm điều hướng, **dừng khi hover**, hiệu ứng `slide-fade`.
 - **Trang chủ — gói "Sinh động":** thanh **breaking** chạy ngang (marquee, dừng khi hover), **dải số liệu đếm tăng** (CountUp rAF), **thanh tiến trình** carousel, **card fade-in so le** (animation-delay), **thời gian tương đối** ("3 giờ trước").
 - **Trang chủ — gói "Giàu thông tin":** `listEvents` bổ sung `sources[]` + `times[]` (từ quan hệ `articles`); FE thêm **SourceStack** (avatar chữ tắt nguồn xếp chồng, gộp theo tên báo, +N), **Sparkline** (SVG bar nhịp bài theo thời gian), **chip từ khóa nổi** từ `/insights` → `/timeline?q=`. **Chat chuyển sang `/chat`** (copy + sửa path). Trang `/events/[id]` (phân tích AI + timeline đa nguồn). `Nav` thêm Trang chủ + Chat; back-link "← Chat"→"← Trang chủ".
-- **Lưu ý:** clustering chạy thủ công `POST /events/cluster` (chưa cron); nên thêm vào scheduler để "live". listEvents chưa trả field hotness (UI không cần).
-- **Verify:** BE build+lint+test 14/14; web typecheck+lint 0; Docker rebuild; cluster 600→457, event detail phân tích 3 báo OK; 7 trang render 200.
+- **Lưu ý:** clustering chạy thủ công `POST /events/cluster` (chưa cron); nên thêm vào scheduler để "live". listEvents chưa trả field hotness (UI không cần) nhưng đã trả `sources[]` + `times[]`.
+- **Verify (cập nhật cuối):** BE build+lint+test 14/14 · web typecheck+lint 0 · Docker rebuild backend+frontend · cluster 600 bài→24 sự kiện đa nguồn · `/events` trả sources+times · event detail phân tích 3 báo OK · **8 trang render 200** (`/`, `/chat`, `/brief`, `/timeline`, `/compare`, `/articles`, `/dashboard`, `/events/[id]`) · homepage: carousel + breaking marquee + count-up + progress bar + card stagger + SourceStack + Sparkline + chip từ khóa đều hoạt động.
 
 ## CT-22 · Gỡ bỏ quả địa cầu — 2026-07-01
 

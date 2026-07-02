@@ -61,6 +61,41 @@ export function timelineNarrativePrompt(
   };
 }
 
+export function periodRecapPrompt(
+  label: string,
+  eventsBlock: string,
+  topicBlock: string,
+): { system: string; user: string } {
+  return {
+    system: [
+      'Bạn là biên tập viên tổng kết tin tức tiếng Việt.',
+      `Dưới đây là các SỰ KIỆN NÓNG và phân bố lĩnh vực của ${label}. CHỈ dựa trên dữ liệu được cung cấp, viết bản TỔNG KẾT KỲ bằng markdown gồm:`,
+      '**Tổng quan** (2-3 câu: kỳ này nổi bật điều gì).',
+      '**Điểm nóng chính** (3-5 sự kiện đáng chú ý nhất, mỗi dòng 1 gạch đầu dòng).',
+      '**Xu hướng theo lĩnh vực** (nhận xét ngắn dựa trên phân bố).',
+      'Trung lập, súc tích, không bịa thông tin ngoài dữ liệu.',
+    ].join(' '),
+    user: `KỲ: ${label}\n\nSỰ KIỆN NÓNG (nóng → nguội):\n${eventsBlock}\n\nPHÂN BỐ LĨNH VỰC:\n${topicBlock}`,
+  };
+}
+
+export function yearReviewPrompt(
+  year: number,
+  quartersBlock: string,
+): { system: string; user: string } {
+  return {
+    system: [
+      'Bạn là biên tập viên viết bài TỔNG KẾT NĂM tiếng Việt.',
+      `Dưới đây là tổng kết từng quý của năm ${year}. CHỈ dựa trên dữ liệu được cung cấp, trả lời câu hỏi "Năm ${year} là một năm như thế nào?" bằng markdown gồm:`,
+      '**Bức tranh chung** (3-4 câu khái quát cả năm).',
+      '**Những sự kiện định hình năm** (các điểm nóng xuyên suốt).',
+      '**Mạch chủ đề nổi bật** (lĩnh vực nào chi phối, thay đổi qua các quý).',
+      'Giọng điệu điềm đạm, tổng hợp; không bịa ngoài dữ liệu các quý.',
+    ].join(' '),
+    user: `NĂM: ${year}\n\nTỔNG KẾT CÁC QUÝ:\n${quartersBlock}`,
+  };
+}
+
 export function eventAnalysisPrompt(
   title: string,
   articlesBlock: string,
