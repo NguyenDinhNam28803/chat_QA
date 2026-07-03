@@ -14,14 +14,14 @@ const md: Components = {
   ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-black/30 underline-offset-2 hover:decoration-accent">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-white/30 underline-offset-2 hover:decoration-accent">
       {children}
     </a>
   ),
   h1: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
   h2: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
   h3: ({ children }) => <h3 className="mb-1 mt-2 font-semibold text-fg">{children}</h3>,
-  code: ({ children }) => <code className="bg-black/5 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
+  code: ({ children }) => <code className="bg-white/5 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
 };
 
 const EXAMPLES = [
@@ -89,9 +89,9 @@ export default function Home() {
       <aside
         className={`${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-black/10 bg-bg transition-transform md:relative md:translate-x-0`}
+        } fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-white/10 bg-bg transition-transform md:relative md:translate-x-0`}
       >
-        <div className="flex items-center gap-2.5 border-b border-black/10 px-4 py-4">
+        <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-sm font-black text-on-accent">
             Đ
           </div>
@@ -105,7 +105,7 @@ export default function Home() {
               setSidebarOpen(false);
             }}
             disabled={streaming}
-            className="flex w-full items-center justify-center gap-2 rounded-md border border-black/15 px-3 py-2.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-40"
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-white/15 px-3 py-2.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-40"
           >
             + Cuộc trò chuyện mới
           </button>
@@ -126,7 +126,7 @@ export default function Home() {
               className={`block w-full truncate border-l-2 py-1.5 pl-2 pr-1 text-left text-sm transition ${
                 c.id === conversationId
                   ? 'border-accent font-medium text-fg'
-                  : 'border-transparent text-muted hover:border-black/20 hover:text-fg'
+                  : 'border-transparent text-muted hover:border-white/20 hover:text-fg'
               }`}
               title={c.title ?? 'Hội thoại'}
             >
@@ -142,8 +142,8 @@ export default function Home() {
 
       {/* ---------- Main ---------- */}
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-black/10 bg-bg/90 px-4 py-3 backdrop-blur">
-          <button onClick={() => setSidebarOpen(true)} className="border border-black/15 px-2 py-1 text-xs md:hidden" aria-label="Mở lịch sử">
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/10 bg-bg/90 px-4 py-3 backdrop-blur">
+          <button onClick={() => setSidebarOpen(true)} className="border border-white/15 px-2 py-1 text-xs md:hidden" aria-label="Mở lịch sử">
             ☰
           </button>
           <div className="flex-1">
@@ -156,13 +156,13 @@ export default function Home() {
         </header>
 
         {topics.length > 0 && (
-          <div className="border-b border-black/10 bg-surface px-4 py-2">
+          <div className="border-b border-white/10 bg-surface px-4 py-2">
             <div className="mx-auto flex w-full max-w-none flex-wrap items-center gap-1.5">
               <span className="label mr-1">Lĩnh vực</span>
               <button
                 onClick={() => setTopic(undefined)}
                 className={`rounded-md border px-2 py-0.5 text-xs transition ${
-                  !topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
+                  !topic ? 'border-fg bg-fg text-bg' : 'border-white/15 text-muted hover:border-white/30 hover:text-fg'
                 }`}
               >
                 Tất cả
@@ -172,7 +172,7 @@ export default function Home() {
                   key={t.topic}
                   onClick={() => setTopic(topic === t.topic ? undefined : t.topic)}
                   className={`rounded-md border px-2 py-0.5 text-xs transition ${
-                    topic === t.topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
+                    topic === t.topic ? 'border-fg bg-fg text-bg' : 'border-white/15 text-muted hover:border-white/30 hover:text-fg'
                   }`}
                 >
                   {t.label}
@@ -203,7 +203,7 @@ export default function Home() {
                   <button
                     key={ex}
                     onClick={() => send(ex)}
-                    className="border border-black/12 bg-surface px-3.5 py-2 text-left text-sm text-muted transition hover:border-accent hover:text-fg"
+                    className="border border-white/12 bg-surface px-3.5 py-2 text-left text-sm text-muted transition hover:border-accent hover:text-fg"
                   >
                     {ex}
                   </button>
@@ -220,7 +220,7 @@ export default function Home() {
               <div key={i} className={`msg-in flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div
                   className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-bold ${
-                    isUser ? 'border border-black/20 text-fg' : 'bg-fg text-bg'
+                    isUser ? 'border border-white/20 text-fg' : 'bg-fg text-bg'
                   }`}
                 >
                   {isUser ? 'Bạn' : 'Đ'}
@@ -231,7 +231,7 @@ export default function Home() {
                     className={
                       isUser
                         ? 'rounded-md bg-fg px-4 py-2.5 leading-relaxed text-bg'
-                        : 'rounded-md border border-black/10 bg-surface px-4 py-3 leading-relaxed'
+                        : 'rounded-md border border-white/10 bg-surface px-4 py-3 leading-relaxed'
                     }
                   >
                     {isUser ? (
@@ -258,7 +258,7 @@ export default function Home() {
                             onClick={() => sendFeedback(m.id!, 1)}
                             title="Hữu ích"
                             className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
-                              m.feedback === 1 ? 'border-accent text-accent' : 'border-transparent text-muted hover:border-black/20'
+                              m.feedback === 1 ? 'border-accent text-accent' : 'border-transparent text-muted hover:border-white/20'
                             }`}
                           >
                             👍
@@ -267,7 +267,7 @@ export default function Home() {
                             onClick={() => sendFeedback(m.id!, -1)}
                             title="Chưa tốt"
                             className={`rounded-md border px-1.5 py-0.5 text-xs transition ${
-                              m.feedback === -1 ? 'border-black/40 text-fg' : 'border-transparent text-muted hover:border-black/20'
+                              m.feedback === -1 ? 'border-white/40 text-fg' : 'border-transparent text-muted hover:border-white/20'
                             }`}
                           >
                             👎
@@ -287,7 +287,7 @@ export default function Home() {
                             href={c.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="group inline-flex max-w-xs items-center gap-1.5 border border-black/10 bg-surface px-2 py-1 text-xs text-muted transition hover:border-accent"
+                            className="group inline-flex max-w-xs items-center gap-1.5 border border-white/10 bg-surface px-2 py-1 text-xs text-muted transition hover:border-accent"
                             title={`${c.title} — ${c.source}`}
                           >
                             <span className="flex h-4 w-4 shrink-0 items-center justify-center bg-fg text-[10px] font-bold text-bg">
@@ -316,11 +316,11 @@ export default function Home() {
                 <div className="flex flex-wrap items-center gap-2 pl-11">
                   <span className="label">Thử</span>
                   {topic && (
-                    <button onClick={() => setTopic(undefined)} className="border border-black/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
+                    <button onClick={() => setTopic(undefined)} className="border border-white/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
                       Bỏ lọc lĩnh vực
                     </button>
                   )}
-                  <Link href="/articles" className="border border-black/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
+                  <Link href="/articles" className="border border-white/15 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg">
                     Duyệt thư viện bài →
                   </Link>
                 </div>
@@ -333,7 +333,7 @@ export default function Home() {
                   <button
                     key={s}
                     onClick={() => send(s)}
-                    className="max-w-xs truncate border border-black/12 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg"
+                    className="max-w-xs truncate border border-white/12 px-3 py-1 text-xs text-muted transition hover:border-accent hover:text-fg"
                     title={s}
                   >
                     {s}
@@ -346,9 +346,9 @@ export default function Home() {
         </main>
 
         {/* Composer */}
-        <div className="border-t border-black/10 bg-bg">
+        <div className="border-t border-white/10 bg-bg">
           <form onSubmit={submit} className="mx-auto w-full max-w-none px-4 py-3.5">
-            <div className="flex items-end gap-2 border border-black/15 bg-surface p-1.5 focus-within:border-accent">
+            <div className="flex items-end gap-2 border border-white/15 bg-surface p-1.5 focus-within:border-accent">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -361,7 +361,7 @@ export default function Home() {
                   onClick={stop}
                   aria-label="Dừng"
                   title="Dừng tạo câu trả lời"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-black/20 text-fg"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/20 text-fg"
                 >
                   <span className="h-3 w-3 bg-fg" />
                 </button>

@@ -78,7 +78,7 @@ export default function PeriodDetailPage() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/review" className="font-display text-sm font-bold">← Nhìn lại</Link>
           <div className="flex-1" />
@@ -105,7 +105,7 @@ export default function PeriodDetailPage() {
               <span className="rounded-md border border-accent/50 px-2 py-0.5 font-mono text-xs font-semibold uppercase tracking-wide text-accent">
                 {data.period.label}
               </span>
-              <span className="label border border-black/15 px-2 py-0.5 text-fg">
+              <span className="label border border-white/15 px-2 py-0.5 text-fg">
                 {data.period.status === 'active' ? '● Đang diễn ra' : 'Đã lưu'}
               </span>
             </div>
@@ -126,7 +126,7 @@ export default function PeriodDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-6 rounded-lg border border-black/10 bg-surface p-5 text-sm text-muted">
+              <div className="mt-6 rounded-lg border border-white/10 bg-surface p-5 text-sm text-muted">
                 {data.period.status === 'active'
                   ? 'Quý đang diễn ra — bản tổng kết AI sẽ được tạo khi quý kết thúc (hoặc chạy POST /periods/rollover).'
                   : 'Chưa đủ dữ liệu để tổng kết quý này.'}
@@ -142,14 +142,14 @@ export default function PeriodDetailPage() {
                     <Link
                       key={e.id}
                       href={`/events/${e.id}`}
-                      className="group flex flex-col rounded-lg border border-black/10 bg-surface p-4 transition hover:border-accent"
+                      className="group flex flex-col rounded-lg border border-white/10 bg-surface p-4 transition hover:border-accent"
                     >
                       <div className="mb-2 flex items-center gap-2">
                         <span className="rounded-md border border-accent/50 px-1.5 py-0.5 font-mono text-[0.65rem] font-semibold uppercase tracking-wide text-accent">
                           {e.sourceCount} báo
                         </span>
                         {e.topic && (
-                          <span className="label border border-black/15 px-1.5 py-0.5 text-fg">
+                          <span className="label border border-white/15 px-1.5 py-0.5 text-fg">
                             {tl(e.topic)}
                           </span>
                         )}
@@ -177,7 +177,7 @@ export default function PeriodDetailPage() {
                           {t.count}
                         </span>
                       </div>
-                      <div className="h-2 bg-black/5">
+                      <div className="h-2 bg-white/5">
                         <div
                           className="h-full bg-accent"
                           style={{ width: `${(t.count / maxTopic) * 100}%` }}

@@ -22,7 +22,7 @@ export function Nav({ current }: { current?: string }) {
           className={`label border px-2 py-1 transition ${
             l.href === current
               ? 'border-fg text-fg'
-              : 'border-transparent hover:border-black/20 hover:text-fg'
+              : 'border-transparent hover:border-white/20 hover:text-fg'
           }`}
         >
           {l.label}

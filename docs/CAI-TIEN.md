@@ -6,6 +6,14 @@
 
 ---
 
+## CT-25 · Đổi design.md → "Ubuntu" (dark) — 2026-07-03
+
+User cập nhật `design.md` sang hệ **Ubuntu** (open-source earth: fedora brown + terminal amber). Re-skin **light → dark** (ngược CT-18).
+- **Palette (dark):** bg #1C150F (neutral, nền), surface #261B13 (thẻ), fg #EDE5D4 (kem — chữ/tiêu đề), muted #A2957C (viền/metadata), **accent #E69E30 (hổ phách — 1 hành động/màn)**, on-accent #1C150F.
+- **Font:** display Space Grotesk (giữ), **body Inter → IBM Plex Sans** (subset latin+vietnamese), label IBM Plex Mono. `layout.tsx` đổi import + biến `--font-ibm-plex-sans`; globals.css trỏ `--font-body`/`--font-sans` sang biến mới. radius sm 3→4px. body line-height 1.6, `.label` letter-spacing 0.06em, ::selection + scrollbar sang tông amber/secondary.
+- **Đảo lớp nền:** script đổi **103** class `-black/` → `-white/` trên 13 file .tsx (viền/nền/divider/decoration hợp nền tối). Giữ lại **1 ngoại lệ**: lớp phủ modal drawer chat `bg-black/60` (scrim che nền vẫn phải tối).
+- **Verify:** web tsc 0 · **local `next build` OK** (validate subset IBM Plex Sans vietnamese, 11 route) · Docker rebuild frontend · CSS bundle chứa #1c150f/#e69e30/#ede5d4/#a2957c + ibm-plex-sans, **token light cũ (#f2f3f5/#ff6a00) đã sạch** · 8 trang render 200.
+
 ## CT-1 · Tách 2 Ollama (chat vs ingestion) — 2026-06-30
 
 **Vấn đề:** ingestion và chat dùng CHUNG một Ollama. Ollama xử lý request tuần tự, nên khi ingestion đang embed hàng loạt chunk, câu hỏi của chat phải xếp hàng phía sau → embed câu hỏi nhảy từ ~0.6s lên **16-28s** → `/chat/stream` timeout.

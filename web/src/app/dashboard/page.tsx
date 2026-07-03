@@ -51,7 +51,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
@@ -142,7 +142,7 @@ export default function DashboardPage() {
                           {topicTotal ? Math.round((t.count / topicTotal) * 100) : 0}% · {t.count}
                         </span>
                       </div>
-                      <div className="h-2 bg-black/5">
+                      <div className="h-2 bg-white/5">
                         <div className="h-full bg-accent transition-all" style={{ width: `${(t.count / maxTopic) * 100}%` }} />
                       </div>
                     </Link>
@@ -159,7 +159,7 @@ export default function DashboardPage() {
                       <Link
                         key={t.term}
                         href={`/timeline?q=${encodeURIComponent(t.term)}`}
-                        className="rounded-md border border-black/15 px-2 py-1 text-xs text-muted transition hover:border-accent hover:text-fg"
+                        className="rounded-md border border-white/15 px-2 py-1 text-xs text-muted transition hover:border-accent hover:text-fg"
                         title={`${t.c} lần`}
                       >
                         {t.term}
@@ -177,7 +177,7 @@ export default function DashboardPage() {
                         <span className="truncate text-muted">{s.source}</span>
                         <span className="ml-2 font-mono text-xs tabular-nums text-muted">{s.c}</span>
                       </div>
-                      <div className="h-2 bg-black/5">
+                      <div className="h-2 bg-white/5">
                         <div className="h-full bg-accent" style={{ width: `${(s.c / maxSource) * 100}%` }} />
                       </div>
                     </div>
@@ -190,7 +190,7 @@ export default function DashboardPage() {
             <Panel title="Tin mới nhất" href="/articles" action="Xem tất cả">
               <ul className="grid gap-x-8 sm:grid-cols-2">
                 {stats.latest.map((a) => (
-                  <li key={a.id} className="border-b border-black/10 py-2">
+                  <li key={a.id} className="border-b border-white/10 py-2">
                     <Link href={`/articles/${a.id}`} className="text-sm font-medium leading-snug hover:text-accent">
                       {a.title}
                     </Link>
@@ -210,7 +210,7 @@ export default function DashboardPage() {
 
 function Kpi({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
-    <div className="rounded-lg border border-black/10 bg-surface p-4">
+    <div className="rounded-lg border border-white/10 bg-surface p-4">
       <div className="font-display text-2xl font-black leading-none tabular-nums">
         {value.toLocaleString('vi-VN')}
       </div>
@@ -236,7 +236,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className={`rounded-lg border border-black/10 bg-surface p-5 ${className}`}>
+    <section className={`rounded-lg border border-white/10 bg-surface p-5 ${className}`}>
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="label">{title}</h2>
         {right}

@@ -80,9 +80,9 @@ export default function ArticlesPage() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3.5">
-          <Link href="/" className="label border border-transparent px-2 py-1 hover:border-black/20 hover:text-fg">
+          <Link href="/" className="label border border-transparent px-2 py-1 hover:border-white/20 hover:text-fg">
             ← Trang chủ
           </Link>
           <h1 className="flex-1 font-display text-[15px] font-bold tracking-tight">
@@ -106,7 +106,7 @@ export default function ArticlesPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Tìm trong tiêu đề + nội dung…"
-            className="flex-1 border border-black/15 bg-surface px-4 py-2.5 outline-none focus:border-accent"
+            className="flex-1 border border-white/15 bg-surface px-4 py-2.5 outline-none focus:border-accent"
           />
           <button type="submit" className="rounded-md bg-accent px-5 py-2.5 font-bold text-on-accent transition hover:brightness-95">
             TÌM
@@ -121,7 +121,7 @@ export default function ArticlesPage() {
               setTopic(undefined);
             }}
             className={`rounded-md border px-2.5 py-1 text-xs transition ${
-              !topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
+              !topic ? 'border-fg bg-fg text-bg' : 'border-white/15 text-muted hover:border-white/30 hover:text-fg'
             }`}
           >
             Tất cả
@@ -134,7 +134,7 @@ export default function ArticlesPage() {
                 setTopic(topic === t.topic ? undefined : t.topic);
               }}
               className={`rounded-md border px-2.5 py-1 text-xs transition ${
-                topic === t.topic ? 'border-fg bg-fg text-bg' : 'border-black/15 text-muted hover:border-black/30 hover:text-fg'
+                topic === t.topic ? 'border-fg bg-fg text-bg' : 'border-white/15 text-muted hover:border-white/30 hover:text-fg'
               }`}
             >
               {t.label} ({t.count})
@@ -146,7 +146,7 @@ export default function ArticlesPage() {
         {loading && !data && (
           <div className="space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="border border-black/10 rounded-lg bg-surface p-4">
+              <div key={i} className="border border-white/10 rounded-lg bg-surface p-4">
                 <Skeleton className="mb-2 h-3 w-32" />
                 <Skeleton className="mb-2 h-5 w-3/4" />
                 <Skeleton className="h-4 w-full" />
@@ -159,9 +159,9 @@ export default function ArticlesPage() {
         )}
         <ul className={`space-y-3 ${loading ? 'opacity-60' : ''}`}>
           {data?.items.map((a) => (
-            <li key={a.id} className="group border border-black/10 rounded-lg bg-surface p-4 transition hover:border-accent">
+            <li key={a.id} className="group border border-white/10 rounded-lg bg-surface p-4 transition hover:border-accent">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="label border border-black/15 px-1.5 py-0.5 text-fg">{labelOf(a.topic)}</span>
+                <span className="label border border-white/15 px-1.5 py-0.5 text-fg">{labelOf(a.topic)}</span>
                 <span className="text-xs text-muted">{a.source}</span>
                 {a.publishedAt && (
                   <span className="text-xs text-muted">· {new Date(a.publishedAt).toLocaleDateString('vi-VN')}</span>
@@ -184,11 +184,11 @@ export default function ArticlesPage() {
 
         {data && totalPages > 1 && (
           <div className="mt-6 flex items-center justify-center gap-3 text-sm">
-            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="border border-black/15 px-3 py-1.5 disabled:opacity-30">
+            <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="border border-white/15 px-3 py-1.5 disabled:opacity-30">
               ← Trước
             </button>
             <span className="text-muted">Trang {page}/{totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="border border-black/15 px-3 py-1.5 disabled:opacity-30">
+            <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)} className="border border-white/15 px-3 py-1.5 disabled:opacity-30">
               Sau →
             </button>
           </div>

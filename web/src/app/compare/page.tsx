@@ -47,7 +47,7 @@ export default function ComparePage() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
@@ -69,7 +69,7 @@ export default function ComparePage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Vd: World Cup, tăng trưởng kinh tế, giá xăng…"
-            className="flex-1 border border-black/15 bg-surface px-4 py-2.5 outline-none focus:border-accent"
+            className="flex-1 border border-white/15 bg-surface px-4 py-2.5 outline-none focus:border-accent"
           />
           <button type="submit" disabled={loading} className="rounded-md bg-accent px-5 py-2.5 font-bold text-on-accent transition hover:brightness-95 disabled:opacity-40">
             {loading ? '…' : 'ĐỐI CHIẾU'}
@@ -81,7 +81,7 @@ export default function ComparePage() {
         {data && (
           <div className="mt-8 space-y-6">
             {data.analysis && (
-              <div className="rounded-lg border border-black/10 bg-surface p-5 text-[0.98rem]">
+              <div className="rounded-lg border border-white/10 bg-surface p-5 text-[0.98rem]">
                 <p className="label mb-2">Phân tích</p>
                 <Markdown>{data.analysis}</Markdown>
               </div>
@@ -93,7 +93,7 @@ export default function ComparePage() {
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
                 {data.groups.map((g) => (
-                  <div key={g.source} className="rounded-lg border border-black/10 bg-surface p-4">
+                  <div key={g.source} className="rounded-lg border border-white/10 bg-surface p-4">
                     <p className="label mb-2 text-fg">{g.source}</p>
                     <ul className="space-y-3">
                       {g.items.map((it) => (

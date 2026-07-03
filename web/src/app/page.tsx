@@ -111,13 +111,13 @@ function SourceStack({ sources }: { sources: string[] }) {
       {show.map((s) => (
         <span
           key={s}
-          className="flex h-6 w-6 items-center justify-center rounded-full border border-black/10 bg-bg font-mono text-[0.58rem] font-bold text-fg"
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-bg font-mono text-[0.58rem] font-bold text-fg"
         >
           {initials(s)}
         </span>
       ))}
       {extra > 0 && (
-        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-black/10 bg-fg font-mono text-[0.58rem] font-bold text-bg">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-fg font-mono text-[0.58rem] font-bold text-bg">
           +{extra}
         </span>
       )}
@@ -231,7 +231,7 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-xs font-black text-on-accent">
@@ -246,7 +246,7 @@ export default function Home() {
 
       {/* ===== Breaking-news ticker ===== */}
       {latest && latest.length > 0 && (
-        <div className="border-b border-black/10 bg-surface">
+        <div className="border-b border-white/10 bg-surface">
           <div className="mx-auto flex w-full max-w-none items-center gap-4 px-4">
             <span className="label flex shrink-0 items-center gap-1.5 py-2.5 text-accent">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
@@ -273,7 +273,7 @@ export default function Home() {
       <main className="mx-auto w-full max-w-none px-4 py-8">
         {/* ===== Period banner — "updated from" date for verification ===== */}
         {period && (
-          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-black/10 bg-surface px-4 py-3">
+          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-white/10 bg-surface px-4 py-3">
             <span className="label border border-accent/50 px-2 py-0.5 text-accent">
               {period.label}
             </span>
@@ -292,7 +292,7 @@ export default function Home() {
 
         {/* ===== Stat band (count-up) ===== */}
         {stats && (
-          <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-black/10 bg-black/10 sm:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 sm:grid-cols-4">
             {[
               { v: stats.totalArticles, l: 'Bài đã nạp' },
               { v: events ? events.length : 0, l: 'Sự kiện nóng' },
@@ -318,7 +318,7 @@ export default function Home() {
                 key={t.term}
                 href={`/timeline?q=${encodeURIComponent(t.term)}`}
                 title={`${t.c} lần · xem dòng thời gian`}
-                className="rounded-full border border-black/15 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-accent"
+                className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-accent"
               >
                 {t.term}
               </Link>
@@ -332,7 +332,7 @@ export default function Home() {
         {!events ? (
           <Skeleton className="h-56 w-full" />
         ) : !cur ? (
-          <div className="rounded-lg border border-black/10 bg-surface p-6 text-sm text-muted">
+          <div className="rounded-lg border border-white/10 bg-surface p-6 text-sm text-muted">
             Chưa có sự kiện đa nguồn. (Chạy gom cụm: POST /events/cluster)
           </div>
         ) : (
@@ -351,11 +351,11 @@ export default function Home() {
                     <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-on-accent" />
                     Đang nóng
                   </span>
-                  <span className="label border border-black/20 px-2 py-0.5 text-fg">
+                  <span className="label border border-white/20 px-2 py-0.5 text-fg">
                     {cur.sourceCount} báo · {cur.articleCount} bài
                   </span>
                   {cur.topic && (
-                    <span className="label border border-black/15 px-2 py-0.5 text-fg">
+                    <span className="label border border-white/15 px-2 py-0.5 text-fg">
                       {label(cur.topic)}
                     </span>
                   )}
@@ -384,7 +384,7 @@ export default function Home() {
             {hot.length > 1 && (
               <>
                 {/* Progress toward next slide */}
-                <div className="absolute inset-x-0 bottom-0 h-[3px] bg-black/5">
+                <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/5">
                   <div
                     key={idx}
                     className="progress-bar h-full bg-accent"
@@ -395,7 +395,7 @@ export default function Home() {
                   type="button"
                   aria-label="Tin nóng trước"
                   onClick={prev}
-                  className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
+                  className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
                 >
                   ‹
                 </button>
@@ -403,7 +403,7 @@ export default function Home() {
                   type="button"
                   aria-label="Tin nóng kế"
                   onClick={next}
-                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-black/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
+                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
                 >
                   ›
                 </button>
@@ -417,7 +417,7 @@ export default function Home() {
                       className={`h-1.5 rounded-full transition-all ${
                         i === idx % hot.length
                           ? 'w-6 bg-accent'
-                          : 'w-1.5 bg-black/20 hover:bg-black/40'
+                          : 'w-1.5 bg-white/20 hover:bg-white/40'
                       }`}
                     />
                   ))}
@@ -439,14 +439,14 @@ export default function Home() {
                   key={e.id}
                   href={`/events/${e.id}`}
                   style={{ animationDelay: `${i * 70}ms` }}
-                  className="slide-fade group flex flex-col rounded-lg border border-black/10 bg-surface p-4 transition hover:border-accent"
+                  className="slide-fade group flex flex-col rounded-lg border border-white/10 bg-surface p-4 transition hover:border-accent"
                 >
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="rounded-md border border-accent/50 px-1.5 py-0.5 font-mono text-[0.65rem] font-semibold uppercase tracking-wide text-accent">
                       {e.sourceCount} báo
                     </span>
                     {e.topic && (
-                      <span className="label border border-black/15 px-1.5 py-0.5 text-fg">
+                      <span className="label border border-white/15 px-1.5 py-0.5 text-fg">
                         {label(e.topic)}
                       </span>
                     )}
@@ -480,7 +480,7 @@ export default function Home() {
             {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12" />)}
           </div>
         ) : (
-          <ul className="divide-y divide-black/10 border-y border-black/10">
+          <ul className="divide-y divide-white/10 border-y border-white/10">
             {latest.map((a, i) => (
               <li key={a.id} className="slide-fade" style={{ animationDelay: `${i * 45}ms` }}>
                 <Link

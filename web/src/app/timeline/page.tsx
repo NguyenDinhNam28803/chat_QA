@@ -43,7 +43,7 @@ export default function TimelinePage() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
@@ -65,7 +65,7 @@ export default function TimelinePage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Vd: Vietnam Airlines, World Cup, giá vàng…"
-            className="flex-1 border border-black/15 bg-surface px-4 py-2.5 outline-none focus:border-accent"
+            className="flex-1 border border-white/15 bg-surface px-4 py-2.5 outline-none focus:border-accent"
           />
           <button type="submit" disabled={loading} className="rounded-md bg-accent px-5 py-2.5 font-bold text-on-accent transition hover:brightness-95 disabled:opacity-40">
             {loading ? '…' : 'XEM'}
@@ -77,7 +77,7 @@ export default function TimelinePage() {
         {data && (
           <div className="mt-8">
             {data.narrative && (
-              <div className="mb-6 rounded-lg border border-black/10 bg-surface p-5 text-[0.98rem]">
+              <div className="mb-6 rounded-lg border border-white/10 bg-surface p-5 text-[0.98rem]">
                 <p className="label mb-2">Tóm tắt diễn biến</p>
                 <Markdown>{data.narrative}</Markdown>
               </div>
@@ -85,7 +85,7 @@ export default function TimelinePage() {
             {data.items.length === 0 ? (
               <p className="text-sm text-muted">Không tìm thấy bài liên quan.</p>
             ) : (
-              <ol className="relative ml-3 border-l-2 border-black/10">
+              <ol className="relative ml-3 border-l-2 border-white/10">
                 {data.items.map((it) => (
                   <li key={it.id} className="mb-5 ml-5">
                     <span className="absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full bg-accent" />

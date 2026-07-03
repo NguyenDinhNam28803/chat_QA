@@ -97,9 +97,9 @@ export default function ArticleDetail() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3.5">
-          <Link href="/articles" className="label border border-transparent px-2 py-1 hover:border-black/20 hover:text-fg">
+          <Link href="/articles" className="label border border-transparent px-2 py-1 hover:border-white/20 hover:text-fg">
             ← Thư viện
           </Link>
         </div>
@@ -120,18 +120,18 @@ export default function ArticleDetail() {
         {article && (
           <article>
             {article.topic && (
-              <span className="label mb-3 inline-block border border-black/15 px-2 py-0.5 text-fg">
+              <span className="label mb-3 inline-block border border-white/15 px-2 py-0.5 text-fg">
                 {TOPIC_LABELS[article.topic] ?? article.topic}
               </span>
             )}
             <h1 className="font-display text-[2.6rem] font-extrabold leading-[1.05] tracking-tight">
               {article.title}
             </h1>
-            <div className="label mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-black/10 pb-4">
+            <div className="label mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-white/10 pb-4">
               <span className="text-fg">{article.source}</span>
               {article.publishedAt && <span>· {new Date(article.publishedAt).toLocaleString('vi-VN')}</span>}
               <span>· {readingMinutes(article.content)} phút đọc</span>
-              <a href={article.url} target="_blank" rel="noopener noreferrer" className="underline decoration-black/30 underline-offset-2 hover:decoration-accent">
+              <a href={article.url} target="_blank" rel="noopener noreferrer" className="underline decoration-white/30 underline-offset-2 hover:decoration-accent">
                 · Nguồn gốc ↗
               </a>
             </div>
@@ -141,13 +141,13 @@ export default function ArticleDetail() {
                 <button
                   onClick={makeSummary}
                   disabled={summarizing}
-                  className="rounded-md border border-black/15 px-3 py-1.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-50"
+                  className="rounded-md border border-white/15 px-3 py-1.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-50"
                 >
                   {summarizing ? 'Đang tóm tắt…' : '✦ Tóm tắt bằng AI'}
                 </button>
               )}
               {summary && (
-                <div className="rounded-lg border border-black/10 bg-surface p-4">
+                <div className="rounded-lg border border-white/10 bg-surface p-4">
                   <p className="label mb-2">Tóm tắt AI</p>
                   <div className="text-[0.95rem]">
                     <Markdown>{summary}</Markdown>
@@ -162,7 +162,7 @@ export default function ArticleDetail() {
               ))}
             </div>
             {/* The single accent action on this screen */}
-            <div className="mt-8 border-t border-black/10 pt-5">
+            <div className="mt-8 border-t border-white/10 pt-5">
               <a
                 href={article.url}
                 target="_blank"
@@ -178,7 +178,7 @@ export default function ArticleDetail() {
         {!loading && related.length > 0 && (
           <section className="mt-12">
             <h2 className="label mb-3">Bài liên quan</h2>
-            <ul className="divide-y divide-black/10 border-y border-black/10">
+            <ul className="divide-y divide-white/10 border-y border-white/10">
               {related.map((r) => (
                 <li key={r.id} className="py-3">
                   <Link href={`/articles/${r.id}`} className="font-medium transition hover:text-accent">

@@ -61,7 +61,7 @@ export default function EventDetail() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
@@ -89,7 +89,7 @@ export default function EventDetail() {
                 {data.event.sourceCount} báo · {data.event.articleCount} bài
               </span>
               {data.event.topic && (
-                <span className="label border border-black/15 px-2 py-0.5 text-fg">
+                <span className="label border border-white/15 px-2 py-0.5 text-fg">
                   {TOPIC_LABELS[data.event.topic] ?? data.event.topic}
                 </span>
               )}
@@ -101,7 +101,7 @@ export default function EventDetail() {
 
             {/* AI consensus / conflict */}
             {data.event.summary ? (
-              <div className="mt-6 rounded-lg border border-black/10 bg-surface p-5">
+              <div className="mt-6 rounded-lg border border-white/10 bg-surface p-5">
                 <p className="label mb-3">✦ Phân tích đa nguồn (AI)</p>
                 <div className="text-[0.98rem]">
                   <Markdown>{data.event.summary}</Markdown>
@@ -115,7 +115,7 @@ export default function EventDetail() {
 
             {/* Cross-source timeline */}
             <h2 className="label mb-3 mt-10">Dòng thời gian · {data.articles.length} bài</h2>
-            <ol className="relative ml-3 border-l-2 border-black/10">
+            <ol className="relative ml-3 border-l-2 border-white/10">
               {data.articles.map((a) => (
                 <li key={a.id} className="mb-5 ml-5">
                   <span className="absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full bg-accent" />

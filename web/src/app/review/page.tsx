@@ -71,7 +71,7 @@ export default function ReviewPage() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
@@ -105,7 +105,7 @@ export default function ReviewPage() {
                   type="button"
                   onClick={() => void loadYear(year)}
                   disabled={loadingYear === year}
-                  className="label border border-black/20 px-3 py-1 text-fg transition hover:border-accent hover:text-accent disabled:opacity-50"
+                  className="label border border-white/20 px-3 py-1 text-fg transition hover:border-accent hover:text-accent disabled:opacity-50"
                 >
                   {loadingYear === year
                     ? 'Đang tổng hợp…'
@@ -135,7 +135,7 @@ export default function ReviewPage() {
                     <Link
                       key={p.id}
                       href={`/review/${p.id}`}
-                      className="group flex flex-col rounded-lg border border-black/10 bg-surface p-4 transition hover:border-accent"
+                      className="group flex flex-col rounded-lg border border-white/10 bg-surface p-4 transition hover:border-accent"
                     >
                       <div className="mb-2 flex items-center gap-2">
                         <span className="label border border-accent/50 px-2 py-0.5 text-accent">

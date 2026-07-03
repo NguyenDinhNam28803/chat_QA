@@ -3,7 +3,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 
 /** Flat placeholder block while content loads. */
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse bg-black/5 ${className}`} />;
+  return <div className={`animate-pulse bg-white/5 ${className}`} />;
 }
 
 /** Highlight query terms — accent, no fill (for search results). */
@@ -35,14 +35,14 @@ const mdComponents: Components = {
   ol: ({ children }) => <ol className="mb-3 ml-4 list-decimal space-y-1">{children}</ol>,
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-black/30 underline-offset-2 hover:decoration-accent">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="underline decoration-white/30 underline-offset-2 hover:decoration-accent">
       {children}
     </a>
   ),
   h1: ({ children }) => <h3 className="mb-1 mt-3 font-display text-lg font-semibold">{children}</h3>,
   h2: ({ children }) => <h3 className="mb-1 mt-3 font-display text-base font-semibold">{children}</h3>,
   h3: ({ children }) => <h4 className="mb-1 mt-2 font-semibold">{children}</h4>,
-  code: ({ children }) => <code className="bg-black/5 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
+  code: ({ children }) => <code className="bg-white/5 px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
 };
 
 /** Shared markdown renderer (AI answers, brief, compare, timeline narrative). */

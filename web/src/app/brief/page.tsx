@@ -33,7 +33,7 @@ export default function BriefPage() {
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
-      <header className="sticky top-0 z-10 border-b border-black/10 bg-bg/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-white/10 bg-bg/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-3">
           <Link href="/" className="font-display text-sm font-bold">← Trang chủ</Link>
           <div className="flex-1" />
@@ -50,7 +50,7 @@ export default function BriefPage() {
           <p className="label mt-2">Ngày {brief.date}{brief.cached ? '' : ' · vừa tạo'}</p>
         )}
 
-        <div className="mt-6 rounded-lg border border-black/10 bg-surface p-6">
+        <div className="mt-6 rounded-lg border border-white/10 bg-surface p-6">
           {loading && (
             <div>
               <p className="label mb-4 animate-pulse">Đang tổng hợp bản tin từ các tin mới nhất…</p>
