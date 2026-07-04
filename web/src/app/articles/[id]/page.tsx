@@ -56,6 +56,26 @@ export default function ArticleDetail() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+  const [questions, setQuestions] = useState<string[] | null>(null);
+  const [loadingQ, setLoadingQ] = useState(false);
+
+  function loadQuestions() {
+    if (!params?.id || loadingQ || questions) return;
+    setLoadingQ(true);
+    void (async () => {
+      try {
+        const res = await fetch(`${API}/articles/${params.id}/questions`);
+        if (res.ok) {
+          const d = (await res.json()) as { questions: string[] };
+          setQuestions(d.questions);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setLoadingQ(false);
+      }
+    })();
+  }
 
   function makeSummary() {
     if (!params?.id || summarizing) return;
@@ -161,6 +181,37 @@ export default function ArticleDetail() {
                 <p key={i}>{p}</p>
               ))}
             </div>
+
+            {/* (E3) AI-suggested follow-up questions → open chat pre-filled */}
+            <div className="mt-8 border-t border-white/10 pt-5">
+              {!questions ? (
+                <button
+                  onClick={loadQuestions}
+                  disabled={loadingQ}
+                  className="rounded-md border border-white/15 px-3 py-1.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-50"
+                >
+                  {loadingQ ? 'Đang gợi ý…' : '✦ Gợi ý câu hỏi để hỏi AI'}
+                </button>
+              ) : questions.length === 0 ? (
+                <p className="text-sm text-muted">Chưa gợi ý được câu hỏi cho bài này.</p>
+              ) : (
+                <>
+                  <p className="label mb-2">Hỏi AI về bài này</p>
+                  <div className="flex flex-col items-start gap-2">
+                    {questions.map((q) => (
+                      <Link
+                        key={q}
+                        href={`/chat?q=${encodeURIComponent(q)}`}
+                        className="border border-white/12 bg-surface px-3.5 py-2 text-left text-sm text-muted transition hover:border-accent hover:text-fg"
+                      >
+                        {q}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* The single accent action on this screen */}
             <div className="mt-8 border-t border-white/10 pt-5">
               <a

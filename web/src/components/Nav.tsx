@@ -4,6 +4,7 @@ import Link from 'next/link';
 const LINKS = [
   { href: '/', label: 'Trang chủ' },
   { href: '/chat', label: 'Chat' },
+  { href: '/factcheck', label: 'Kiểm chứng' },
   { href: '/brief', label: 'Bản tin' },
   { href: '/timeline', label: 'Dòng thời gian' },
   { href: '/compare', label: 'Đối chiếu' },

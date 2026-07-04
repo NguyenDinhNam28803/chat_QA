@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
-/* ===== Ubuntu — open-source earth: fedora brown, terminal amber ===== */
+/* ===== IoT Home — smart-home dashboard: warm dark, peach glow ===== */
 @theme {
-  --color-bg: #1c150f; /* neutral — page foundation */
-  --color-surface: #261b13; /* cards */
-  --color-fg: #ede5d4; /* primary — headlines & core text */
-  --color-muted: #a2957c; /* secondary — borders, captions, metadata */
-  --color-accent: #e69e30; /* tertiary — the sole interaction accent */
-  --color-on-accent: #1c150f; /* text on accent */
+  --color-bg: #17181b; /* neutral — page foundation */
+  --color-surface: #1f2024; /* cards */
+  --color-fg: #f0efe9; /* primary — headlines & core text */
+  --color-muted: #8a857a; /* secondary — borders, captions, metadata */
+  --color-accent: #ffb98c; /* tertiary — the sole interaction accent (peach) */
+  --color-on-accent: #17181b; /* text on accent */
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
 
-  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
-  --font-body: var(--font-ibm-plex-sans), system-ui, sans-serif;
-  --font-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
-  --font-sans: var(--font-ibm-plex-sans), system-ui, sans-serif;
+  /* One family everywhere (Manrope) — display/body/label all share it. */
+  --font-display: var(--font-manrope), system-ui, sans-serif;
+  --font-body: var(--font-manrope), system-ui, sans-serif;
+  --font-mono: var(--font-manrope), ui-monospace, monospace;
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
 }
 
 html {
@@ -28,36 +29,37 @@ body {
   color: var(--color-fg);
   font-family: var(--font-body);
   font-size: 0.95rem;
-  line-height: 1.6;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: rgba(230, 158, 48, 0.3);
-  color: #ede5d4;
+  background: rgba(255, 185, 140, 0.28);
+  color: #f0efe9;
 }
 
 /* Slim scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(162, 149, 124, 0.4) transparent;
+  scrollbar-color: rgba(138, 133, 122, 0.4) transparent;
 }
 *::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 *::-webkit-scrollbar-thumb {
-  background: rgba(162, 149, 124, 0.3);
+  background: rgba(138, 133, 122, 0.3);
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(162, 149, 124, 0.55);
+  background: rgba(138, 133, 122, 0.55);
 }
 
-/* Uppercase mono label */
+/* Uppercase label — Manrope 600 */
 .label {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 0.72rem;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-muted);

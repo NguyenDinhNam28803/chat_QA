@@ -7,6 +7,7 @@ import {
   dailyBriefPrompt,
   compareSourcesPrompt,
   timelineNarrativePrompt,
+  suggestQuestionsPrompt,
 } from '../llm/features.prompts';
 import { TOPIC_LABELS, type Topic } from '../ingestion/topic.classifier';
 
@@ -218,6 +219,37 @@ export class ArticlesService {
     const summary = (await this.llm.generate(system, user)).trim();
     await this.prisma.article.update({ where: { id }, data: { summary } });
     return { summary, cached: false };
+  }
+
+  /** E3 — AI-suggested follow-up questions for an article (cached). */
+  async suggestQuestions(id: string): Promise<{ questions: string[] }> {
+    const a = await this.prisma.article.findUnique({
+      where: { id },
+      select: { title: true, content: true, questions: true },
+    });
+    if (!a) return { questions: [] };
+    if (Array.isArray(a.questions)) {
+      return { questions: a.questions as string[] };
+    }
+    let questions: string[] = [];
+    try {
+      const { system, user } = suggestQuestionsPrompt(a.title, a.content);
+      const raw = await this.llm.generate(system, user);
+      questions = raw
+        .split('\n')
+        .map((l) => l.replace(/^\s*[-*\d.)]+\s*/, '').trim())
+        .filter((l) => l.length > 0)
+        .slice(0, 3);
+    } catch {
+      return { questions: [] };
+    }
+    if (questions.length > 0) {
+      await this.prisma.article.update({
+        where: { id },
+        data: { questions },
+      });
+    }
+    return { questions };
   }
 
   /** Pillar 1b — daily brief (cached per calendar day). */

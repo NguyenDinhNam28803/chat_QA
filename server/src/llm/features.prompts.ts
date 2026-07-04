@@ -96,6 +96,53 @@ export function yearReviewPrompt(
   };
 }
 
+export function rewriteFollowupPrompt(
+  history: string,
+  question: string,
+): { system: string; user: string } {
+  return {
+    system: [
+      'Bạn viết lại câu hỏi nối tiếp thành MỘT truy vấn tìm kiếm ĐỘC LẬP bằng tiếng Việt.',
+      'Thay đại từ/tham chiếu ("ông ấy", "vụ đó", "họ") bằng thực thể cụ thể suy từ lịch sử hội thoại.',
+      'CHỈ trả về đúng một câu truy vấn, không giải thích, không thêm dấu ngoặc kép.',
+      'Nếu câu hỏi vốn đã độc lập, trả lại gần như nguyên văn.',
+    ].join(' '),
+    user: `LỊCH SỬ HỘI THOẠI:\n${history}\n\nCÂU HỎI NỐI TIẾP: ${question}\n\nTRUY VẤN ĐỘC LẬP:`,
+  };
+}
+
+export function factCheckPrompt(
+  claim: string,
+  context: string,
+): { system: string; user: string } {
+  return {
+    system: [
+      'Bạn là công cụ KIỂM CHỨNG thông tin tiếng Việt, làm việc CHỈ trên các đoạn nguồn được cung cấp.',
+      'Đọc nhận định của người dùng, đối chiếu với ngữ cảnh, phân loại lập trường của các nguồn.',
+      'DÒNG ĐẦU TIÊN bắt buộc là một trong ba nhãn (viết y nguyên):',
+      'VERDICT: supported  — khi nhiều nguồn xác nhận nhận định.',
+      'VERDICT: conflicting — khi các nguồn mâu thuẫn nhau về nhận định.',
+      'VERDICT: insufficient — khi ngữ cảnh không đủ dữ liệu để kết luận.',
+      'Sau đó viết markdown gồm: **Ủng hộ** (đoạn/nguồn ủng hộ, trích [số]), **Phản bác / lưu ý** (đoạn mâu thuẫn hoặc thiếu, trích [số]), **Kết luận** (1-2 câu).',
+      'TUYỆT ĐỐI không dùng kiến thức ngoài ngữ cảnh; thiếu dữ liệu thì trung thực nói insufficient.',
+    ].join(' '),
+    user: `NHẬN ĐỊNH CẦN KIỂM CHỨNG: ${claim}\n\nNGỮ CẢNH (các đoạn từ nhiều nguồn):\n${context}`,
+  };
+}
+
+export function suggestQuestionsPrompt(
+  title: string,
+  content: string,
+): { system: string; user: string } {
+  return {
+    system: [
+      'Bạn gợi ý 3 câu hỏi mà người đọc có thể muốn hỏi thêm sau khi đọc bài báo.',
+      'Câu hỏi ngắn gọn, cụ thể, trả lời được từ tin tức. Mỗi câu một dòng, KHÔNG đánh số, KHÔNG giải thích.',
+    ].join(' '),
+    user: `TIÊU ĐỀ: ${title}\n\nNỘI DUNG:\n${content.slice(0, 3000)}`,
+  };
+}
+
 export function eventAnalysisPrompt(
   title: string,
   articlesBlock: string,

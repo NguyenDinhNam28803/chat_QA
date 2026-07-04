@@ -15,7 +15,14 @@ export interface Citation {
   source: string;
 }
 
+export interface Confidence {
+  level: 'high' | 'medium' | 'low';
+  sources: number; // distinct source articles backing the answer
+  minDistance: number; // best (smallest) cosine distance among retrieved chunks
+}
+
 export interface RetrievalResult {
   context: string;
   citations: Citation[];
+  confidence: Confidence;
 }

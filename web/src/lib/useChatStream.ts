@@ -8,11 +8,18 @@ export interface Citation {
   source: string;
 }
 
+export interface Confidence {
+  level: 'high' | 'medium' | 'low';
+  sources: number;
+  minDistance: number;
+}
+
 export interface ChatMessage {
   id?: string;
   role: 'user' | 'assistant';
   content: string;
   citations?: Citation[];
+  confidence?: Confidence;
   feedback?: number | null;
 }
 
@@ -129,6 +136,7 @@ export function useChatStream() {
             ...copy[copy.length - 1],
             id: data.messageId as string,
             citations: data.citations as Citation[],
+            confidence: data.confidence as Confidence | undefined,
           };
           return copy;
         });

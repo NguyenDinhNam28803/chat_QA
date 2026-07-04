@@ -23,6 +23,7 @@ model Article {
   contentHash String    @unique
   topic       String?
   summary     String?
+  questions   Json? // AI-suggested follow-up questions (E3), cached
   eventId     String?
   createdAt   DateTime  @default(now())
 

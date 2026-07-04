@@ -1,36 +1,37 @@
 ---
 version: alpha
-name: Ubuntu
-description: Open-source earth: fedora brown, terminal amber, community warm.
+name: IoT Home
+description: Smart-home dashboard: warm dark, peach glow, cool teal.
 colors:
-  primary: "#EDE5D4"
-  secondary: "#A2957C"
-  tertiary: "#E69E30"
-  neutral: "#1C150F"
-  surface: "#261B13"
-  on-primary: "#1C150F"
+  primary: "#F0EFE9"
+  secondary: "#8A857A"
+  tertiary: "#FFB98C"
+  neutral: "#17181B"
+  surface: "#1F2024"
+  on-primary: "#17181B"
 typography:
   display:
-    fontFamily: Space Grotesk
+    fontFamily: Manrope
     fontSize: 3.75rem
     fontWeight: 600
-    letterSpacing: "-0.02em"
+    letterSpacing: "-0.025em"
   h1:
-    fontFamily: Space Grotesk
+    fontFamily: Manrope
     fontSize: 2rem
     fontWeight: 600
   body:
-    fontFamily: IBM Plex Sans
+    fontFamily: Manrope
     fontSize: 0.95rem
-    lineHeight: 1.6
+    lineHeight: 1.55
   label:
-    fontFamily: IBM Plex Mono
+    fontFamily: Manrope
     fontSize: 0.72rem
+    fontWeight: 600
     letterSpacing: "0.06em"
 rounded:
-  sm: 4px
-  md: 6px
-  lg: 10px
+  sm: 8px
+  md: 14px
+  lg: 22px
 spacing:
   sm: 8px
   md: 16px
@@ -49,23 +50,23 @@ components:
 ---
 ## Overview
 
-An open-source community palette: fedora brown, terminal amber, community warmth.
+A smart-home dashboard: deep dark with a warm peach accent and teal status.
 
 ## Colors
 
 The palette is built around high-contrast neutrals and a single accent that drives interaction.
 
-- **Primary (`#EDE5D4`):** Headlines and core text.
-- **Secondary (`#A2957C`):** Borders, captions, and metadata.
-- **Tertiary (`#E69E30`):** The sole driver for interaction. Reserve it.
-- **Neutral (`#1C150F`):** The page foundation.
+- **Primary (`#F0EFE9`):** Headlines and core text.
+- **Secondary (`#8A857A`):** Borders, captions, and metadata.
+- **Tertiary (`#FFB98C`):** The sole driver for interaction. Reserve it.
+- **Neutral (`#17181B`):** The page foundation.
 
 ## Typography
 
-- **display:** Space Grotesk 3.75rem
-- **h1:** Space Grotesk 2rem
-- **body:** IBM Plex Sans 0.95rem
-- **label:** IBM Plex Mono 0.72rem
+- **display:** Manrope 3.75rem
+- **h1:** Manrope 2rem
+- **body:** Manrope 0.95rem
+- **label:** Manrope 0.72rem
 
 ## Do's and Don'ts
 

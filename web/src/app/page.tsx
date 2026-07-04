@@ -27,6 +27,7 @@ interface EventItem {
   lastSeen: string | null;
   sources: string[];
   times: string[];
+  developing?: boolean;
 }
 interface ArticleRow {
   id: string;
@@ -166,12 +167,39 @@ function Sparkline({ times, className = '' }: { times: string[]; className?: str
   );
 }
 
+// Consistent section heading (mono label + display title).
+function SectionHead({
+  label,
+  title,
+  className = 'mt-10',
+}: {
+  label?: string;
+  title: string;
+  className?: string;
+}) {
+  return (
+    <div className={`mb-3 ${className}`}>
+      {label && <p className="label mb-1 text-accent">{label}</p>}
+      <h2 className="font-display text-xl font-bold tracking-tight">{title}</h2>
+    </div>
+  );
+}
+
+const TOOLS = [
+  { href: '/factcheck', label: 'Kiểm chứng nhận định', icon: '✓' },
+  { href: '/brief', label: 'Bản tin hôm nay', icon: '❉' },
+  { href: '/timeline', label: 'Dòng thời gian', icon: '↗' },
+  { href: '/compare', label: 'Đối chiếu nguồn', icon: '⇄' },
+  { href: '/chat', label: 'Hỏi AI về tin tức', icon: '◈' },
+];
+
 export default function Home() {
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [latest, setLatest] = useState<ArticleRow[] | null>(null);
   const [stats, setStats] = useState<{ totalArticles: number; topics: number; sources: number } | null>(null);
   const [trending, setTrending] = useState<{ term: string; c: number }[]>([]);
   const [period, setPeriod] = useState<PeriodActive | null>(null);
+  const [developing, setDeveloping] = useState<EventItem[]>([]);
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -184,13 +212,15 @@ export default function Home() {
         setPeriod(p);
         const fromQ =
           p?.startDate ? `?from=${encodeURIComponent(p.startDate)}` : '';
-        const [e, a, s, i] = await Promise.all([
+        const [e, a, s, i, dev] = await Promise.all([
           fetch(`${API}/events${fromQ}`),
           fetch(`${API}/articles`),
           fetch(`${API}/articles/stats`),
           fetch(`${API}/insights`),
+          fetch(`${API}/events/developing`),
         ]);
         if (e.ok) setEvents(await e.json());
+        if (dev.ok) setDeveloping(await dev.json());
         if (a.ok) {
           const r = (await a.json()) as { items: ArticleRow[] };
           setLatest(r.items.slice(0, 12));
@@ -226,8 +256,6 @@ export default function Home() {
   }, [hot.length, paused]);
 
   const cur = hot.length ? hot[idx % hot.length] : null;
-  const prev = () => setIdx((i) => (i - 1 + hot.length) % hot.length);
-  const next = () => setIdx((i) => (i + 1) % hot.length);
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
@@ -270,37 +298,43 @@ export default function Home() {
         </div>
       )}
 
-      <main className="mx-auto w-full max-w-none px-4 py-8">
-        {/* ===== Period banner — "updated from" date for verification ===== */}
-        {period && (
-          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-white/10 bg-surface px-4 py-3">
-            <span className="label border border-accent/50 px-2 py-0.5 text-accent">
-              {period.label}
-            </span>
-            <span className="text-sm text-muted">
-              Tin tức được cập nhật từ ngày{' '}
-              <b className="font-semibold text-fg">{fmtDate(period.startDate)}</b>
-            </span>
-            <Link
-              href="/review"
-              className="label ml-auto text-muted transition hover:text-accent"
-            >
-              Nhìn lại các quý →
-            </Link>
-          </div>
-        )}
+      <main className="mx-auto w-full max-w-none px-4 py-6">
+        {/* ===== Toolbar: quarter + review link ===== */}
+        <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 className="font-display text-lg font-extrabold tracking-tight">Bảng tin</h1>
+          {period && (
+            <>
+              <span className="label border border-accent/50 px-2 py-0.5 text-accent">
+                {period.label}
+              </span>
+              <span className="text-sm text-muted">
+                cập nhật từ{' '}
+                <b className="font-semibold text-fg">{fmtDate(period.startDate)}</b>
+              </span>
+            </>
+          )}
+          <Link
+            href="/review"
+            className="label ml-auto text-muted transition hover:text-accent"
+          >
+            Nhìn lại các quý →
+          </Link>
+        </div>
 
-        {/* ===== Stat band (count-up) ===== */}
+        {/* ===== KPI tiles ===== */}
         {stats && (
-          <div className="mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 sm:grid-cols-4">
+          <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               { v: stats.totalArticles, l: 'Bài đã nạp' },
               { v: events ? events.length : 0, l: 'Sự kiện nóng' },
               { v: stats.topics, l: 'Lĩnh vực' },
               { v: stats.sources, l: 'Nguồn tin' },
             ].map((k) => (
-              <div key={k.l} className="bg-surface px-4 py-3">
-                <div className="font-display text-2xl font-black tabular-nums leading-none">
+              <div
+                key={k.l}
+                className="rounded-lg border border-white/10 bg-surface px-4 py-3.5"
+              >
+                <div className="font-display text-[1.7rem] font-extrabold tabular-nums leading-none text-fg">
                   <CountUp value={k.v} />
                 </div>
                 <div className="label mt-1.5">{k.l}</div>
@@ -309,81 +343,76 @@ export default function Home() {
           </div>
         )}
 
-        {/* ===== Trending keyword chips ===== */}
-        {trending.length > 0 && (
-          <div className="mb-6 flex flex-wrap items-center gap-1.5">
-            <span className="label mr-1 text-accent">🔥 Từ khóa nổi</span>
-            {trending.map((t) => (
-              <Link
-                key={t.term}
-                href={`/timeline?q=${encodeURIComponent(t.term)}`}
-                title={`${t.c} lần · xem dòng thời gian`}
-                className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-accent"
-              >
-                {t.term}
-              </Link>
-            ))}
-          </div>
-        )}
-
-        <p className="label mb-3">🔴 Điểm nóng · sự kiện nhiều báo cùng đưa</p>
-
-        {/* ===== HERO — hot-events carousel (auto-rotate, loops) ===== */}
+        {/* ===== Điểm nóng — spotlight carousel + ranked rail (master–detail) ===== */}
+        <SectionHead
+          label="🔴 Điểm nóng"
+          title="Sự kiện nhiều báo cùng đưa"
+          className="mt-0"
+        />
         {!events ? (
-          <Skeleton className="h-56 w-full" />
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Skeleton className="h-80 lg:col-span-2" />
+            <Skeleton className="h-80" />
+          </div>
         ) : !cur ? (
           <div className="rounded-lg border border-white/10 bg-surface p-6 text-sm text-muted">
             Chưa có sự kiện đa nguồn. (Chạy gom cụm: POST /events/cluster)
           </div>
         ) : (
           <div
-            className="relative rounded-lg border-2 border-fg bg-surface"
+            className="grid gap-4 lg:grid-cols-3"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
           >
-            <Link
-              href={`/events/${cur.id}`}
-              className="group block px-6 py-8 md:px-14 md:py-12"
-            >
-              <div key={cur.id} className="slide-fade">
-                <div className="mb-4 flex flex-wrap items-center gap-2">
-                  <span className="flex items-center gap-1.5 rounded-md bg-accent px-2 py-0.5 font-mono text-[0.7rem] font-bold uppercase tracking-wide text-on-accent">
-                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-on-accent" />
-                    Đang nóng
-                  </span>
-                  <span className="label border border-white/20 px-2 py-0.5 text-fg">
-                    {cur.sourceCount} báo · {cur.articleCount} bài
-                  </span>
-                  {cur.topic && (
-                    <span className="label border border-white/15 px-2 py-0.5 text-fg">
-                      {label(cur.topic)}
+            {/* Spotlight */}
+            <div className="relative overflow-hidden rounded-lg border border-white/12 bg-surface lg:col-span-2">
+              <Link
+                href={`/events/${cur.id}`}
+                className="group block px-6 py-8 md:px-10 md:py-10"
+              >
+                <div key={cur.id} className="slide-fade">
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2 py-0.5 font-mono text-[0.7rem] font-bold uppercase tracking-wide text-on-accent">
+                      <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-on-accent" />
+                      Đang nóng
                     </span>
-                  )}
-                  <span className="label ml-auto">{rel(cur.lastSeen)}</span>
+                    <span className="label border border-white/20 px-2 py-0.5 text-fg">
+                      {cur.sourceCount} báo · {cur.articleCount} bài
+                    </span>
+                    {cur.topic && (
+                      <span className="label border border-white/15 px-2 py-0.5 text-fg">
+                        {label(cur.topic)}
+                      </span>
+                    )}
+                    {cur.developing && (
+                      <span className="label inline-flex items-center gap-1 border border-accent/50 px-2 py-0.5 text-accent">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                        Đang phát triển
+                      </span>
+                    )}
+                    <span className="label ml-auto">{rel(cur.lastSeen)}</span>
+                  </div>
+                  <h2 className="font-display text-[1.9rem] font-extrabold leading-[1.06] tracking-tight transition group-hover:text-accent md:text-[2.6rem]">
+                    {cur.title}
+                  </h2>
+                  <div className="mt-5 flex flex-wrap items-center gap-3">
+                    <SourceStack sources={cur.sources} />
+                    <span className="label text-muted">
+                      {pubs(cur.sources).slice(0, 3).join(' · ')}
+                      {pubs(cur.sources).length > 3
+                        ? ` +${pubs(cur.sources).length - 3}`
+                        : ''}
+                    </span>
+                    {cur.times.length > 1 && (
+                      <Sparkline times={cur.times} className="ml-auto h-6 w-24 opacity-80" />
+                    )}
+                  </div>
+                  <p className="mt-4 text-sm text-muted">
+                    Xem phân tích đồng thuận &amp; đối chiếu giữa các nguồn →
+                  </p>
                 </div>
-                <h1 className="max-w-4xl font-display text-[2.2rem] font-extrabold leading-[1.05] tracking-tight transition group-hover:text-accent md:text-[3.2rem]">
-                  {cur.title}
-                </h1>
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <SourceStack sources={cur.sources} />
-                  <span className="label text-muted">
-                    {pubs(cur.sources).slice(0, 3).join(' · ')}
-                    {pubs(cur.sources).length > 3 ? ` +${pubs(cur.sources).length - 3}` : ''}
-                  </span>
-                  {cur.times.length > 1 && (
-                    <Sparkline times={cur.times} className="ml-auto h-6 w-24 opacity-80" />
-                  )}
-                </div>
-                <p className="mt-4 font-mono text-sm text-muted">
-                  Xem phân tích đồng thuận &amp; đối chiếu giữa các nguồn →
-                </p>
-              </div>
-            </Link>
-
-            {/* Controls */}
-            {hot.length > 1 && (
-              <>
-                {/* Progress toward next slide */}
+              </Link>
+              {hot.length > 1 && (
                 <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/5">
                   <div
                     key={idx}
@@ -391,84 +420,170 @@ export default function Home() {
                     style={{ animationPlayState: paused ? 'paused' : 'running' }}
                   />
                 </div>
-                <button
-                  type="button"
-                  aria-label="Tin nóng trước"
-                  onClick={prev}
-                  className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
-                >
-                  ‹
-                </button>
-                <button
-                  type="button"
-                  aria-label="Tin nóng kế"
-                  onClick={next}
-                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-surface/90 text-lg text-muted transition hover:border-accent hover:text-accent"
-                >
-                  ›
-                </button>
-                <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5">
-                  {hot.map((h, i) => (
+              )}
+            </div>
+
+            {/* Ranked rail — click a row to spotlight it */}
+            <div className="rounded-lg border border-white/10 bg-surface p-2">
+              <p className="label px-2 py-2">Bảng xếp hạng nóng</p>
+              <div className="flex flex-col">
+                {hot.map((h, i) => {
+                  const active = i === idx % hot.length;
+                  return (
                     <button
                       key={h.id}
                       type="button"
-                      aria-label={`Tin nóng ${i + 1}`}
                       onClick={() => setIdx(i)}
-                      className={`h-1.5 rounded-full transition-all ${
-                        i === idx % hot.length
-                          ? 'w-6 bg-accent'
-                          : 'w-1.5 bg-white/20 hover:bg-white/40'
+                      className={`group flex items-start gap-3 rounded-md px-2 py-2.5 text-left transition ${
+                        active ? 'bg-white/5' : 'hover:bg-white/5'
                       }`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+                    >
+                      <span
+                        className={`font-display text-sm font-extrabold tabular-nums ${
+                          active ? 'text-accent' : 'text-muted'
+                        }`}
+                      >
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={`line-clamp-2 text-sm font-semibold leading-snug ${
+                            active ? 'text-fg' : 'text-muted group-hover:text-fg'
+                          }`}
+                        >
+                          {h.title}
+                        </span>
+                        <span className="label mt-1 block">
+                          {h.sourceCount} báo · {rel(h.lastSeen)}
+                        </span>
+                      </span>
+                      {h.developing && (
+                        <span
+                          title="Đang phát triển"
+                          className="mt-1.5 h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-accent"
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* ===== Lineup — event grid ===== */}
-        {rest.length > 0 && (
-          <>
-            <h2 className="mb-3 mt-10 font-display text-xl font-bold tracking-tight">
-              Các sự kiện khác
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {rest.map((e, i) => (
+        {/* ===== B2 — developing stories (still unfolding) ===== */}
+        {developing.length > 0 && (
+          <section>
+            <SectionHead label="● Đang phát triển" title="Câu chuyện còn cập nhật" />
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {developing.map((e) => (
                 <Link
                   key={e.id}
                   href={`/events/${e.id}`}
-                  style={{ animationDelay: `${i * 70}ms` }}
-                  className="slide-fade group flex flex-col rounded-lg border border-white/10 bg-surface p-4 transition hover:border-accent"
+                  className="group flex w-64 shrink-0 flex-col rounded-lg border border-white/10 bg-surface p-4 transition hover:border-accent"
                 >
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="rounded-md border border-accent/50 px-1.5 py-0.5 font-mono text-[0.65rem] font-semibold uppercase tracking-wide text-accent">
-                      {e.sourceCount} báo
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="label inline-flex items-center gap-1 text-accent">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+                      Đang phát triển
                     </span>
-                    {e.topic && (
-                      <span className="label border border-white/15 px-1.5 py-0.5 text-fg">
-                        {label(e.topic)}
-                      </span>
-                    )}
                     <span className="label ml-auto">{rel(e.lastSeen)}</span>
                   </div>
                   <h3 className="flex-1 font-display font-bold leading-snug transition group-hover:text-accent">
                     {e.title}
                   </h3>
-                  <div className="mt-3 flex items-center gap-2">
-                    <SourceStack sources={e.sources} />
-                    {e.times.length > 1 && (
-                      <Sparkline times={e.times} className="ml-auto h-5 w-16 opacity-70" />
-                    )}
-                  </div>
-                  <p className="label mt-2">{e.articleCount} bài · đối chiếu →</p>
+                  <p className="label mt-3">
+                    {e.sourceCount} báo · {e.articleCount} bài →
+                  </p>
                 </Link>
               ))}
             </div>
-          </>
+          </section>
         )}
 
-        {/* ===== Agenda — latest news ticker ===== */}
+        {/* ===== Sự kiện khác (grid) + rail (từ khóa + công cụ) ===== */}
+        <SectionHead title="Khám phá thêm" />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            {rest.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {rest.map((e, i) => (
+                  <Link
+                    key={e.id}
+                    href={`/events/${e.id}`}
+                    style={{ animationDelay: `${i * 70}ms` }}
+                    className="slide-fade group flex flex-col rounded-lg border border-white/10 bg-surface p-4 transition hover:border-accent"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-md border border-accent/50 px-1.5 py-0.5 font-mono text-[0.65rem] font-semibold uppercase tracking-wide text-accent">
+                        {e.sourceCount} báo
+                      </span>
+                      {e.topic && (
+                        <span className="label border border-white/15 px-1.5 py-0.5 text-fg">
+                          {label(e.topic)}
+                        </span>
+                      )}
+                      <span className="label ml-auto">{rel(e.lastSeen)}</span>
+                    </div>
+                    <h3 className="flex-1 font-display font-bold leading-snug transition group-hover:text-accent">
+                      {e.title}
+                    </h3>
+                    <div className="mt-3 flex items-center gap-2">
+                      <SourceStack sources={e.sources} />
+                      {e.times.length > 1 && (
+                        <Sparkline times={e.times} className="ml-auto h-5 w-16 opacity-70" />
+                      )}
+                    </div>
+                    <p className="label mt-2">{e.articleCount} bài · đối chiếu →</p>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Chưa có thêm sự kiện.</p>
+            )}
+          </div>
+
+          {/* Rail */}
+          <div className="flex flex-col gap-4">
+            {trending.length > 0 && (
+              <div className="rounded-lg border border-white/10 bg-surface p-4">
+                <p className="label mb-3 text-accent">🔥 Từ khóa nổi</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {trending.map((t) => (
+                    <Link
+                      key={t.term}
+                      href={`/timeline?q=${encodeURIComponent(t.term)}`}
+                      title={`${t.c} lần · xem dòng thời gian`}
+                      className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-accent"
+                    >
+                      {t.term}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="rounded-lg border border-white/10 bg-surface p-4">
+              <p className="label mb-3">Công cụ</p>
+              <div className="flex flex-col">
+                {TOOLS.map((t) => (
+                  <Link
+                    key={t.href}
+                    href={t.href}
+                    className="group flex items-center gap-3 rounded-md px-2 py-2 text-sm text-muted transition hover:bg-white/5 hover:text-fg"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/15 text-xs text-accent">
+                      {t.icon}
+                    </span>
+                    <span className="flex-1">{t.label}</span>
+                    <span className="text-muted transition group-hover:text-accent">→</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== Dòng tin mới (agenda) ===== */}
         <div className="mb-3 mt-12 flex items-baseline justify-between gap-3">
           <h2 className="font-display text-xl font-bold tracking-tight">Dòng tin mới</h2>
           <Link href="/articles" className="label text-muted transition hover:text-accent">

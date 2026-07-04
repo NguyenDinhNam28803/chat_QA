@@ -26,6 +26,11 @@ export class ArticlesController {
     return this.articles.getSummary(id);
   }
 
+  @Get(':id/questions')
+  questions(@Param('id') id: string) {
+    return this.articles.suggestQuestions(id);
+  }
+
   @Get()
   list(
     @Query('q') q?: string,

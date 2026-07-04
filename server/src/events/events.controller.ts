@@ -14,6 +14,11 @@ export class EventsController {
     );
   }
 
+  @Get('developing')
+  developing() {
+    return this.events.listDeveloping();
+  }
+
   @Post('cluster')
   cluster() {
     return this.events.cluster();

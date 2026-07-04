@@ -35,7 +35,35 @@ describe('buildContext', () => {
     expect(citations[0]).toMatchObject({ index: 1, articleId: 'a' });
   });
 
-  it('returns empty for no rows', () => {
-    expect(buildContext([])).toEqual({ context: '', citations: [] });
+  it('scores confidence from distance and source count', () => {
+    const { confidence } = buildContext([
+      {
+        content: 'A1',
+        articleId: 'a',
+        url: 'u-a',
+        title: 'TA',
+        source: 'S',
+        distance: 0.4,
+      },
+      {
+        content: 'B1',
+        articleId: 'b',
+        url: 'u-b',
+        title: 'TB',
+        source: 'S',
+        distance: 0.5,
+      },
+    ]);
+    // 2 distinct sources + strong match (0.4) → high confidence.
+    expect(confidence).toMatchObject({ level: 'high', sources: 2 });
+    expect(confidence.minDistance).toBeCloseTo(0.4);
+  });
+
+  it('returns empty (low-confidence) for no rows', () => {
+    expect(buildContext([])).toEqual({
+      context: '',
+      citations: [],
+      confidence: { level: 'low', sources: 0, minDistance: 1 },
+    });
   });
 });

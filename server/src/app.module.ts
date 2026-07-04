@@ -12,6 +12,7 @@ import { HealthModule } from './health/health.module';
 import { ArticlesModule } from './articles/articles.module';
 import { EventsModule } from './events/events.module';
 import { PeriodsModule } from './periods/periods.module';
+import { FactcheckModule } from './factcheck/factcheck.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PeriodsModule } from './periods/periods.module';
     ArticlesModule,
     EventsModule,
     PeriodsModule,
+    FactcheckModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -147,6 +147,7 @@ export class EventsService {
         topic: true,
         articleCount: true,
         sourceCount: true,
+        firstSeen: true,
         lastSeen: true,
         articles: {
           select: { source: true, publishedAt: true },
@@ -154,6 +155,13 @@ export class EventsService {
         },
       },
     });
+    // Reference = the freshest activity in this batch. Using it (instead of
+    // wall-clock now()) keeps "developing" meaningful even when the corpus is a
+    // day or two stale between ingestion runs.
+    const ref = events.reduce(
+      (mx, e) => Math.max(mx, e.lastSeen ? e.lastSeen.getTime() : 0),
+      0,
+    );
     return events.map(({ articles, ...e }) => ({
       ...e,
       // Distinct source names (for stacked source badges).
@@ -163,7 +171,42 @@ export class EventsService {
         .map((a) => a.publishedAt)
         .filter((d): d is Date => !!d)
         .map((d) => d.toISOString()),
+      // (B2) Story still unfolding: fresh coverage + spread over time.
+      developing: this.isDeveloping(
+        e.firstSeen,
+        e.lastSeen,
+        e.articleCount,
+        ref,
+      ),
     }));
+  }
+
+  /** (B2) A story is "developing" if it got fresh coverage (within 24h of the
+   * newest activity) AND has run across several articles over time — not a
+   * one-shot report. */
+  private isDeveloping(
+    firstSeen: Date | null,
+    lastSeen: Date | null,
+    articleCount: number,
+    ref: number,
+  ): boolean {
+    if (!firstSeen || !lastSeen || ref === 0) return false;
+    const recentH = (ref - lastSeen.getTime()) / 3_600_000;
+    const spanH = (lastSeen.getTime() - firstSeen.getTime()) / 3_600_000;
+    return recentH <= 24 && spanH >= 6 && articleCount >= 3;
+  }
+
+  /** (B2) Developing stories only, most recently active first. */
+  async listDeveloping(limit = 8) {
+    const all = await this.listEvents(60);
+    return all
+      .filter((e) => e.developing)
+      .sort(
+        (a, b) =>
+          (b.lastSeen ? b.lastSeen.getTime() : 0) -
+          (a.lastSeen ? a.lastSeen.getTime() : 0),
+      )
+      .slice(0, limit);
   }
 
   /** Event detail: articles across sources + cached consensus/conflict analysis. */

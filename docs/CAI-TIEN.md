@@ -6,6 +6,26 @@
 
 ---
 
+## CT-27 · Tái cấu trúc trang chủ theo dashboard chuyên nghiệp — 2026-07-04
+
+Trang chủ trước là chuỗi section xếp dọc đơn điệu → sắp lại theo **bố cục dashboard/bento có phân cấp** (hợp design IoT Home "smart-home dashboard").
+- **Thanh công cụ** gọn: tên "Bảng tin" + nhãn quý + "cập nhật từ ngày" + link Nhìn lại (gộp banner cũ).
+- **KPI tiles** 4 ô rời (rounded-lg, viền) thay dải liền.
+- **Điểm nóng = master–detail:** lưới `lg:grid-cols-3` — **spotlight carousel** (col-span-2, tự xoay + thanh tiến trình) + **"Bảng xếp hạng nóng"** (rail): danh sách top 5 đánh số 01–05, **bấm 1 dòng để spotlight dòng đó** (`setIdx`), dòng active tô accent; chấm "đang phát triển". Bỏ nút ‹ › + dots (rail thay điều hướng); hover cả cụm để tạm dừng auto-rotate.
+- **Đang phát triển** (B2): dải thẻ cuộn ngang với `SectionHead` nhất quán.
+- **Sự kiện khác + rail:** lưới `lg:grid-cols-3` — lưới sự kiện (col-span-2, 2 cột) + **rail** gồm card "Từ khóa nổi" (chips → timeline) + card **"Công cụ"** (quick-links: Kiểm chứng/Bản tin/Dòng thời gian/Đối chiếu/Hỏi AI).
+- **Dòng tin mới:** agenda full-width (giữ).
+- Thêm helper `SectionHead` (label mono + tiêu đề display) dùng lại toàn trang. Giữ đúng 1 accent (peach) + phẳng.
+- **Verify:** tsc + lint 0 · Docker rebuild frontend · `/` render 200.
+
+## CT-26 · Đổi design.md → "IoT Home" (dark, peach) — 2026-07-04
+
+User cập nhật `design.md` sang hệ **IoT Home** (smart-home: warm dark, peach glow). Dark → dark nên **chỉ đổi token + font**, KHÔNG đảo black/white.
+- **Palette (dark):** bg #17181B (neutral xanh-đen), surface #1F2024, fg #F0EFE9 (kem sáng), muted #8A857A, **accent #FFB98C (đào — 1 hành động/màn)**, on-accent #17181B.
+- **Font:** **một họ Manrope cho tất cả** (display/body/label) — thay Space Grotesk + IBM Plex Sans + IBM Plex Mono. `layout.tsx` import 1 `Manrope` (weight 400-800, subset latin+vietnamese), biến `--font-manrope`; globals trỏ cả 4 `--font-*` sang Manrope. `.label` đổi từ mono → Manrope 600 (giữ uppercase + 0.06em).
+- **Bo góc lớn hơn:** radius sm 4→8px, md 6→14px, lg 10→22px (cảm giác mềm "smart-home"). body line-height 1.6→1.55. ::selection + scrollbar sang tông đào/secondary.
+- **Verify:** web tsc 0 · `next build` OK (validate Manrope subset vietnamese, 13 route) · Docker rebuild frontend · CSS bundle chứa #17181b/#ffb98c/#f0efe9 + manrope, **token Ubuntu cũ (#e69e30/#1c150f) đã sạch** · 6 trang render 200.
+
 ## CT-25 · Đổi design.md → "Ubuntu" (dark) — 2026-07-03
 
 User cập nhật `design.md` sang hệ **Ubuntu** (open-source earth: fedora brown + terminal amber). Re-skin **light → dark** (ngược CT-18).

@@ -2,7 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import ReactMarkdown, { type Components } from 'react-markdown';
-import { useChatStream, type Citation } from '../../lib/useChatStream';
+import {
+  useChatStream,
+  type Citation,
+  type Confidence,
+} from '../../lib/useChatStream';
 import { Nav } from '../../components/Nav';
 
 // Markdown — flat, Inter body. Links stay fg (accent reserved for the one action).
@@ -53,6 +57,23 @@ function followUps(citations?: Citation[]): string[] {
   return s;
 }
 
+// (A3) Answer confidence: relevance of retrieved chunks + number of sources.
+function ConfidenceBadge({ c }: { c: Confidence }) {
+  const map = {
+    high: { icon: '✓', t: 'Độ tin cậy cao', cls: 'text-muted' },
+    medium: { icon: '≈', t: 'Độ tin cậy trung bình', cls: 'text-muted' },
+    low: { icon: '⚠', t: 'Độ tin cậy thấp — nên kiểm chứng', cls: 'text-accent' },
+  }[c.level];
+  return (
+    <span
+      className={`label inline-flex items-center gap-1 ${c.level === 'low' ? 'border border-accent/50 px-1.5 py-0.5' : ''} ${map.cls}`}
+      title={`Khoảng cách ngữ nghĩa ${c.minDistance.toFixed(2)} · ${c.sources} nguồn độc lập`}
+    >
+      {map.icon} {map.t} · {c.sources} nguồn
+    </span>
+  );
+}
+
 export default function Home() {
   const {
     messages,
@@ -72,10 +93,23 @@ export default function Home() {
   const [input, setInput] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const sentInitial = useRef(false);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // (E3) Auto-ask a question passed via /chat?q=… (e.g. from an article page).
+  useEffect(() => {
+    if (sentInitial.current) return;
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q && q.trim()) {
+      sentInitial.current = true;
+      send(q);
+      window.history.replaceState(null, '', '/chat');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -250,7 +284,8 @@ export default function Home() {
                   </div>
 
                   {!isUser && m.content && !isEmptyStreaming && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {m.confidence && <ConfidenceBadge c={m.confidence} />}
                       <CopyButton text={m.content} />
                       {m.id && (
                         <>
