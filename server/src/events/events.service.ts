@@ -196,6 +196,27 @@ export class EventsService {
     return recentH <= 24 && spanH >= 6 && articleCount >= 3;
   }
 
+  /** (P2) Blind spots / scoops: stories only ONE source has reported. */
+  async listBlindspots(limit = 30) {
+    const events = await this.prisma.event.findMany({
+      where: { sourceCount: 1 },
+      orderBy: { lastSeen: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        topic: true,
+        articleCount: true,
+        lastSeen: true,
+        articles: { select: { source: true }, take: 1 },
+      },
+    });
+    return events.map(({ articles, ...e }) => ({
+      ...e,
+      source: articles[0]?.source ?? '',
+    }));
+  }
+
   /** (B2) Developing stories only, most recently active first. */
   async listDeveloping(limit = 8) {
     const all = await this.listEvents(60);

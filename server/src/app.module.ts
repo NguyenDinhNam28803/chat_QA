@@ -13,6 +13,8 @@ import { ArticlesModule } from './articles/articles.module';
 import { EventsModule } from './events/events.module';
 import { PeriodsModule } from './periods/periods.module';
 import { FactcheckModule } from './factcheck/factcheck.module';
+import { SourcesModule } from './sources/sources.module';
+import { EntitiesModule } from './entities/entities.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { FactcheckModule } from './factcheck/factcheck.module';
     EventsModule,
     PeriodsModule,
     FactcheckModule,
+    SourcesModule,
+    EntitiesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

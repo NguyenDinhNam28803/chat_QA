@@ -1,0 +1,691 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Điểm Tin AI — Kiến trúc chi tiết</title>
+<script>
+  (function () {
+    const saved = localStorage.getItem('theme');
+    const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', dark);
+  })();
+</script>
+<style>
+  :root {
+    --bg: #F4F3EF; --surface: #FFFFFF; --surface2: #EAE8E1;
+    --ink: #17181B; --body: #3A3A38; --muted: #6E6A62;
+    --line: #D6D3CA; --line-soft: #E5E2DA;
+    --accent: #B96A2E; --accent-soft: rgba(185,106,46,0.10);
+    --teal: #3F7C74; --teal-soft: rgba(63,124,116,0.12);
+    --zone: rgba(23,24,27,0.025); --zone-line: #D6D3CA;
+    --sub: rgba(23,24,27,0.02); --sub-line: #C9C6BC;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  html.dark {
+    --bg: #17181B; --surface: #1F2024; --surface2: #26272C;
+    --ink: #F0EFE9; --body: #CFCCC4; --muted: #8A857A;
+    --line: #35363C; --line-soft: #26272C;
+    --accent: #FFB98C; --accent-soft: rgba(255,185,140,0.14);
+    --teal: #6FBDB1; --teal-soft: rgba(111,189,177,0.16);
+    --zone: rgba(240,239,233,0.03); --zone-line: #35363C;
+    --sub: rgba(240,239,233,0.02); --sub-line: #3E3F45;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--body); font-family: var(--sans);
+    -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  .bar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 12px 20px; border-bottom: 1px solid var(--line-soft); flex: none;
+  }
+  .bar h1 { font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+  .bar .sub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .spacer { flex: 1; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+    padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px;
+    background: transparent; color: var(--muted); cursor: pointer; transition: all .15s ease;
+  }
+  .chip:hover { color: var(--ink); border-color: var(--muted); }
+  .chip.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  #themeToggle {
+    font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: transparent; color: var(--muted); cursor: pointer;
+  }
+  #themeToggle:hover { color: var(--ink); border-color: var(--muted); }
+
+  .stage { flex: 1; position: relative; min-height: 0; }
+  .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .zone rect { fill: var(--zone); stroke: var(--zone-line); stroke-width: 1; stroke-dasharray: 5 5; rx: 16; }
+  .zone .ztitle { font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; fill: var(--muted); }
+  .zone .zsub { font-family: var(--mono); font-size: 10.5px; fill: var(--muted); opacity: 0.75; }
+  .subzone rect { fill: var(--sub); stroke: var(--sub-line); stroke-width: 1; stroke-dasharray: 3 5; rx: 12; }
+  .subzone .stitle { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; fill: var(--muted); opacity: 0.85; }
+
+  .node { cursor: pointer; }
+  .node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.4; rx: 10; transition: stroke .15s ease; }
+  .node:hover rect { stroke: var(--muted); }
+  .node.sel rect { stroke: var(--accent) !important; stroke-width: 2; }
+  .node .t { font-size: 13px; font-weight: 700; fill: var(--ink); pointer-events: none; }
+  .node .m { font-family: var(--mono); font-size: 10px; fill: var(--muted); pointer-events: none; }
+  .node .k { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; fill: var(--accent); pointer-events: none; }
+  .node.gate rect { fill: var(--accent-soft); stroke: var(--accent); }
+  .node.store rect { fill: var(--teal-soft); stroke: var(--teal); }
+  .node.store .k { fill: var(--teal); }
+  .node.ext rect { stroke-dasharray: 6 3; }
+  .node.pure rect { fill: var(--surface2); }
+
+  .edge { stroke: var(--muted); stroke-width: 1.4; fill: none; marker-end: url(#a-mut); opacity: 0.75; transition: opacity .2s ease, stroke .2s ease; }
+  .edge.dash { stroke-dasharray: 5 4; }
+  .elbl { font-family: var(--mono); font-size: 10px; fill: var(--muted); transition: opacity .2s ease; }
+
+  .stage.flowing .edge { opacity: 0.08; }
+  .stage.flowing .elbl { opacity: 0.08; }
+  .stage.flowing .node { opacity: 0.24; }
+  .stage.flowing .zone, .stage.flowing .subzone { opacity: 0.4; }
+  .stage.flowing .edge.lit {
+    opacity: 1; stroke: var(--accent); marker-end: url(#a-acc); stroke-width: 1.9;
+    stroke-dasharray: 7 5; animation: march 0.9s linear infinite;
+  }
+  .stage.flowing .elbl.lit { opacity: 1; fill: var(--accent); }
+  .stage.flowing .node.lit { opacity: 1; }
+  .stage.flowing .node.lit rect { stroke: var(--accent); }
+  @keyframes march { to { stroke-dashoffset: -12; } }
+  @media (prefers-reduced-motion: reduce) { .stage.flowing .edge.lit { animation: none; } }
+
+  .card {
+    position: absolute; max-width: 400px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 16px; box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+  }
+  #detail { right: 16px; bottom: 16px; width: 360px; }
+  #detail h3 { font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+  #detail .meta { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-bottom: 8px; }
+  #detail p { font-size: 12.5px; line-height: 1.55; }
+  #detail p code, #flowcap code { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  #flowcap { left: 16px; bottom: 16px; max-width: 480px; display: none; }
+  #flowcap.show { display: block; }
+  #flowcap .fname { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  #flowcap ol { margin-left: 18px; }
+  #flowcap li { font-size: 12.5px; line-height: 1.55; }
+  .src { position: absolute; top: 10px; right: 16px; font-family: var(--mono); font-size: 10px; color: var(--muted); opacity: 0.8; }
+  @media (max-width: 980px) {
+    body { overflow: auto; }
+    .stage { min-height: 84vh; }
+    #detail { position: static; width: auto; margin: 10px 16px; }
+    #flowcap { position: static; margin: 0 16px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div>
+    <h1>Điểm Tin AI — kiến trúc chi tiết</h1>
+    <div class="sub">37 thành phần · 7 luồng nghiệp vụ · 2 Ollama · 1 nguồn sự thật</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="chips" id="chips">
+    <button class="chip on" data-flow="all">Toàn cảnh</button>
+    <button class="chip" data-flow="ingest">Nạp tin</button>
+    <button class="chip" data-flow="rag">Hỏi–đáp RAG</button>
+    <button class="chip" data-flow="intel">Trí tuệ sự kiện</button>
+    <button class="chip" data-flow="periods">Lưu trữ quý</button>
+    <button class="chip" data-flow="factcheck">Kiểm chứng</button>
+    <button class="chip" data-flow="meta">Meta báo chí</button>
+    <button class="chip" data-flow="pillars">Trụ AI</button>
+  </div>
+  <button id="themeToggle">Theme</button>
+</div>
+
+<div class="stage" id="stage">
+<svg viewBox="0 0 1900 1220" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Sơ đồ kiến trúc chi tiết Điểm Tin AI">
+  <defs>
+    <marker id="a-mut" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted)"/>
+    </marker>
+    <marker id="a-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" style="fill: var(--accent)"/>
+    </marker>
+  </defs>
+
+  <!-- ── zones ─────────────────────────────── -->
+  <g class="zone" id="z-client">
+    <rect x="40" y="110" width="250" height="1030"/>
+    <text class="ztitle" x="58" y="140">Trình duyệt</text>
+    <text class="zsub" x="58" y="158">Next.js App Router · :3001</text>
+  </g>
+  <g class="zone" id="z-back">
+    <rect x="330" y="110" width="1110" height="1030"/>
+    <text class="ztitle" x="348" y="140">Backend NestJS · :3000</text>
+  </g>
+  <g class="zone" id="z-infra">
+    <rect x="1480" y="110" width="380" height="1030"/>
+    <text class="ztitle" x="1498" y="140">Hạ tầng</text>
+    <text class="zsub" x="1498" y="158">một nguồn sự thật cho mỗi loại dữ liệu</text>
+  </g>
+
+  <g class="subzone">
+    <rect x="350" y="150" width="1070" height="185"/>
+    <text class="stitle" x="368" y="178">Nạp tin · chạy nền, không chặn request</text>
+  </g>
+  <g class="subzone">
+    <rect x="350" y="370" width="250" height="660"/>
+    <text class="stitle" x="368" y="394">HTTP · Controllers</text>
+  </g>
+  <g class="subzone">
+    <rect x="630" y="370" width="790" height="660"/>
+    <text class="stitle" x="648" y="394">Nghiệp vụ · Services</text>
+  </g>
+
+  <!-- ── edges: ingest lane ────────────────── -->
+  <path class="edge dash" id="e-sched-redis"      d="M462,215 C 470,172 1250,166 1500,198"/>
+  <path class="edge"      id="e-sched-proc"       d="M555,250 L585,250"/>
+  <path class="edge"      id="e-proc-rss"         d="M770,250 L800,250"/>
+  <path class="edge"      id="e-rss-extract"      d="M985,250 L1015,250"/>
+  <path class="edge"      id="e-extract-chunk"    d="M1200,250 L1230,250"/>
+  <path class="edge"      id="e-chunk-embed"      d="M1415,272 C 1432,320 1432,780 1400,846"/>
+  <path class="edge"      id="e-chunk-prisma"     d="M1415,284 C 1444,360 1446,1000 1424,1066"/>
+  <path class="edge"      id="e-embed-ollamaIngest" d="M1400,838 C 1450,832 1462,610 1500,586"/>
+
+  <!-- ── edges: client → controller ────────── -->
+  <path class="edge" id="e-chat-ui"      d="M270,327 C 320,330 332,418 368,428"/>
+  <path class="edge" id="e-home-events"  d="M270,200 C 322,204 336,340 344,430 C 350,478 352,496 368,506"/>
+  <path class="edge" id="e-home-periods" d="M270,230 C 326,236 340,360 348,470 C 354,556 356,578 368,588"/>
+  <path class="edge" id="e-event-ui"     d="M270,628 C 320,622 336,566 368,534"/>
+  <path class="edge" id="e-fc-ui"        d="M270,425 C 328,428 340,600 368,672"/>
+  <path class="edge" id="e-meta-blind"   d="M270,495 C 316,496 336,514 368,520"/>
+  <path class="edge" id="e-meta-sources" d="M270,528 C 330,532 340,700 368,754"/>
+  <path class="edge" id="e-meta-entities" d="M270,560 C 334,564 344,780 368,836"/>
+  <path class="edge" id="e-review-ui"    d="M270,722 C 320,716 338,650 368,614"/>
+  <path class="edge" id="e-articles-ui"  d="M270,817 C 320,820 338,904 368,918"/>
+  <path class="edge" id="e-brief-ui"     d="M270,922 C 316,926 340,944 368,946"/>
+
+  <!-- ── edges: controller → service ───────── -->
+  <path class="edge" id="e-cchat-schat"        d="M582,436 C 606,438 626,444 650,448"/>
+  <path class="edge" id="e-cevents-sevents"    d="M582,518 C 608,522 626,546 650,556"/>
+  <path class="edge" id="e-cperiods-speriods"  d="M582,600 C 610,604 626,644 650,662"/>
+  <path class="edge" id="e-cfc-sfc"            d="M582,682 C 610,686 626,742 650,760"/>
+  <path class="edge" id="e-csources-smeta"     d="M582,764 C 610,768 626,834 650,852"/>
+  <path class="edge" id="e-centities-smeta"    d="M582,846 C 608,848 628,872 650,880"/>
+  <path class="edge" id="e-carticles-sarticles" d="M582,935 C 610,938 628,956 650,962"/>
+
+  <!-- ── edges: service → service ──────────── -->
+  <path class="edge" id="e-schat-sret"   d="M1000,442 L1030,442"/>
+  <path class="edge" id="e-schat-sllm"   d="M1000,480 C 1012,488 1014,616 1030,644"/>
+  <path class="edge" id="e-sret-scontext" d="M1215,505 L1215,520"/>
+  <path class="edge" id="e-sret-sembed"  d="M1040,505 C 1012,560 1008,800 1028,852"/>
+  <path class="edge" id="e-events-llm"   d="M1000,556 C 1016,562 1018,624 1030,636"/>
+  <path class="edge" id="e-periods-llm"  d="M1000,668 C 1012,668 1020,662 1030,658"/>
+  <path class="edge" id="e-fc-ret"       d="M1000,748 C 1006,700 1002,520 1026,470"/>
+  <path class="edge" id="e-fc-llm"       d="M1000,780 C 1014,776 1020,706 1030,698"/>
+  <path class="edge" id="e-articles-llm" d="M1000,948 C 1022,930 1024,760 1030,712"/>
+  <path class="edge" id="e-prompts-llm"  d="M1215,735 L1215,722"/>
+
+  <!-- ── edges: service → prisma → pg ──────── -->
+  <path class="edge" id="e-chat-prisma"     d="M650,486 C 606,494 604,700 604,940 C 604,1012 632,1046 672,1050"/>
+  <path class="edge" id="e-events-prisma"   d="M650,600 C 613,606 611,720 611,940 C 611,1014 648,1046 692,1050"/>
+  <path class="edge" id="e-periods-prisma"  d="M650,704 C 620,710 618,790 618,940 C 618,1016 666,1046 712,1050"/>
+  <path class="edge" id="e-meta-prisma"     d="M650,900 C 628,906 626,940 626,970 C 626,1016 686,1046 732,1050"/>
+  <path class="edge" id="e-articles-prisma" d="M760,1010 L760,1050"/>
+  <path class="edge" id="e-ret-prisma"      d="M1400,500 C 1420,560 1420,990 1404,1050"/>
+  <path class="edge" id="e-prisma-pg"       d="M1420,1078 C 1468,1074 1474,520 1500,440"/>
+
+  <!-- ── edges: infra ──────────────────────── -->
+  <path class="edge" id="e-embed-ollamaChat" d="M1400,870 C 1452,862 1466,742 1500,706"/>
+  <path class="edge" id="e-llm-openrouter"   d="M1400,690 C 1448,694 1462,782 1500,806"/>
+
+  <!-- ── edge labels ───────────────────────── -->
+  <text class="elbl" data-e="e-sched-redis"        x="980" y="168" text-anchor="middle">job lặp mỗi 30′ · BullMQ</text>
+  <text class="elbl" data-e="e-chunk-embed"        x="1408" y="304" text-anchor="end">embed cả lô</text>
+  <text class="elbl" data-e="e-chunk-prisma"       x="1408" y="324" text-anchor="end">ghi 1 transaction</text>
+  <text class="elbl" data-e="e-ret-prisma"         x="1396" y="960" text-anchor="end">$queryRaw · pgvector &lt;=&gt; + tsvector · RRF</text>
+  <text class="elbl" data-e="e-prisma-pg"          x="1472" y="474" text-anchor="end">Prisma</text>
+  <text class="elbl" data-e="e-embed-ollamaIngest" x="1472" y="606" text-anchor="end">:11435</text>
+  <text class="elbl" data-e="e-embed-ollamaChat"   x="1472" y="742" text-anchor="end">:11434</text>
+  <text class="elbl" data-e="e-llm-openrouter"     x="1472" y="798" text-anchor="end">fallback thủ công</text>
+  <text class="elbl" data-e="e-fc-ret"             x="1004" y="700" text-anchor="end">k=12</text>
+  <text class="elbl" data-e="e-meta-prisma"        x="644" y="968" text-anchor="end">0 LLM</text>
+
+  <!-- ── nodes: client pages ───────────────── -->
+  <g class="node" data-k="p-home">
+    <rect x="60" y="170" width="210" height="95"/>
+    <text class="t" x="78" y="196">/ — Trang chủ</text>
+    <text class="m" x="78" y="216">spotlight + bảng xếp hạng</text>
+    <text class="m" x="78" y="232">đang phát triển · KPI</text>
+    <text class="m" x="78" y="248">rail từ khóa &amp; công cụ</text>
+  </g>
+  <g class="node" data-k="p-chat">
+    <rect x="60" y="285" width="210" height="85"/>
+    <text class="t" x="78" y="311">/chat</text>
+    <text class="m" x="78" y="331">EventSource · SSE</text>
+    <text class="m" x="78" y="347">badge độ tin cậy (A3)</text>
+  </g>
+  <g class="node" data-k="p-factcheck">
+    <rect x="60" y="390" width="210" height="70"/>
+    <text class="t" x="78" y="416">/factcheck</text>
+    <text class="m" x="78" y="436">verdict + nguồn đối chứng</text>
+  </g>
+  <g class="node" data-k="p-meta">
+    <rect x="60" y="480" width="210" height="95"/>
+    <text class="t" x="78" y="506">/sources · /entities</text>
+    <text class="m" x="78" y="526">/blindspots</text>
+    <text class="m" x="78" y="542">hồ sơ báo · thực thể</text>
+    <text class="m" x="78" y="558">tin chỉ 1 nguồn đưa</text>
+  </g>
+  <g class="node" data-k="p-event">
+    <rect x="60" y="595" width="210" height="70"/>
+    <text class="t" x="78" y="621">/events/[id]</text>
+    <text class="m" x="78" y="641">đồng thuận / mâu thuẫn</text>
+  </g>
+  <g class="node" data-k="p-review">
+    <rect x="60" y="685" width="210" height="75"/>
+    <text class="t" x="78" y="711">/review · /review/[id]</text>
+    <text class="m" x="78" y="731">tổng kết quý &amp; năm</text>
+  </g>
+  <g class="node" data-k="p-articles">
+    <rect x="60" y="780" width="210" height="75"/>
+    <text class="t" x="78" y="806">/articles · /[id]</text>
+    <text class="m" x="78" y="826">tóm tắt AI · gợi ý câu hỏi</text>
+  </g>
+  <g class="node" data-k="p-brief">
+    <rect x="60" y="875" width="210" height="95"/>
+    <text class="t" x="78" y="901">/brief · /timeline</text>
+    <text class="m" x="78" y="921">/compare · /dashboard</text>
+    <text class="m" x="78" y="937">bản tin · dòng thời gian</text>
+    <text class="m" x="78" y="953">đối chiếu · thống kê</text>
+  </g>
+
+  <!-- ── nodes: ingest lane ────────────────── -->
+  <g class="node" data-k="sched">
+    <rect x="370" y="215" width="185" height="70"/>
+    <text class="t" x="386" y="241">IngestionScheduler</text>
+    <text class="m" x="386" y="261">onModuleInit → drain</text>
+    <text class="m" x="386" y="275">repeat 30′ / feed</text>
+  </g>
+  <g class="node" data-k="processor">
+    <rect x="585" y="215" width="185" height="70"/>
+    <text class="t" x="601" y="241">IngestionProcessor</text>
+    <text class="m" x="601" y="261">BullMQ WorkerHost</text>
+    <text class="m" x="601" y="275">retry · removeOnFail</text>
+  </g>
+  <g class="node" data-k="rss">
+    <rect x="800" y="215" width="185" height="70"/>
+    <text class="t" x="816" y="241">RssService</text>
+    <text class="m" x="816" y="261">parseURL → RawFeedItem</text>
+    <text class="m" x="816" y="275">cap 60 item / feed</text>
+  </g>
+  <g class="node" data-k="extract">
+    <rect x="1015" y="215" width="185" height="70"/>
+    <text class="t" x="1031" y="241">ContentExtractor</text>
+    <text class="m" x="1031" y="261">Readability · timeout 15s</text>
+    <text class="m" x="1031" y="275">dedup: URL + contentHash</text>
+  </g>
+  <g class="node" data-k="chunk">
+    <rect x="1230" y="215" width="185" height="70"/>
+    <text class="t" x="1246" y="241">ChunkService</text>
+    <text class="m" x="1246" y="261">~400 token, theo câu</text>
+    <text class="m" x="1246" y="275">overlap 50 token</text>
+  </g>
+
+  <!-- ── nodes: controllers ────────────────── -->
+  <g class="node" data-k="c-chat">
+    <rect x="368" y="405" width="214" height="62"/>
+    <text class="t" x="384" y="429">ChatController</text>
+    <text class="m" x="384" y="449">@Sse /chat/stream</text>
+  </g>
+  <g class="node" data-k="c-events">
+    <rect x="368" y="487" width="214" height="62"/>
+    <text class="t" x="384" y="511">EventsController</text>
+    <text class="m" x="384" y="531">/events · /developing · /blindspots</text>
+  </g>
+  <g class="node" data-k="c-periods">
+    <rect x="368" y="569" width="214" height="62"/>
+    <text class="t" x="384" y="593">PeriodsController</text>
+    <text class="m" x="384" y="613">/active · /:id · /year/:y · rollover</text>
+  </g>
+  <g class="node" data-k="c-factcheck">
+    <rect x="368" y="651" width="214" height="62"/>
+    <text class="t" x="384" y="675">FactcheckController</text>
+    <text class="m" x="384" y="695">GET /factcheck?claim=</text>
+  </g>
+  <g class="node" data-k="c-sources">
+    <rect x="368" y="733" width="214" height="62"/>
+    <text class="t" x="384" y="757">SourcesController</text>
+    <text class="m" x="384" y="777">/sources · /sources/:name</text>
+  </g>
+  <g class="node" data-k="c-entities">
+    <rect x="368" y="815" width="214" height="62"/>
+    <text class="t" x="384" y="839">EntitiesController</text>
+    <text class="m" x="384" y="859">/entities · /entities/:name</text>
+  </g>
+  <g class="node" data-k="c-articles">
+    <rect x="368" y="897" width="214" height="76"/>
+    <text class="t" x="384" y="921">Articles + Features</text>
+    <text class="m" x="384" y="941">/articles · /:id/summary · /questions</text>
+    <text class="m" x="384" y="957">/brief · /timeline · /compare · /insights</text>
+  </g>
+
+  <!-- ── nodes: services (colL) ────────────── -->
+  <g class="node gate" data-k="s-chat">
+    <rect x="650" y="405" width="350" height="90"/>
+    <text class="t" x="668" y="431">ChatService</text>
+    <text class="k" x="668" y="449">E1 · rewriteFollowup</text>
+    <text class="m" x="668" y="469">điều phối SSE: truy hồi → stream → lưu</text>
+    <text class="m" x="668" y="485">Message + citations (Json)</text>
+  </g>
+  <g class="node" data-k="s-events">
+    <rect x="650" y="508" width="350" height="100"/>
+    <text class="t" x="668" y="534">EventsService</text>
+    <text class="k" x="668" y="552">B1 · B2 · P2</text>
+    <text class="m" x="668" y="572">cluster(): cosine ≥ 0.72 trên chunk ord 0</text>
+    <text class="m" x="668" y="588">getEvent(): đồng thuận/mâu thuẫn (cache)</text>
+    <text class="m" x="668" y="602">listDeveloping() · listBlindspots()</text>
+  </g>
+  <g class="node" data-k="s-periods">
+    <rect x="650" y="621" width="350" height="90"/>
+    <text class="t" x="668" y="647">PeriodsService</text>
+    <text class="m" x="668" y="667">getActive(): tự tạo quý + archive quý cũ</text>
+    <text class="m" x="668" y="683">computeStats() LIVE theo khoảng ngày</text>
+    <text class="m" x="668" y="699">recap quý (cache) · yearReview (cache)</text>
+  </g>
+  <g class="node" data-k="s-factcheck">
+    <rect x="650" y="724" width="350" height="80"/>
+    <text class="t" x="668" y="750">FactcheckService</text>
+    <text class="k" x="668" y="768">A1 · phân loại lập trường</text>
+    <text class="m" x="668" y="788">supported / conflicting / insufficient</text>
+  </g>
+  <g class="node pure" data-k="s-meta">
+    <rect x="650" y="817" width="350" height="90"/>
+    <text class="t" x="668" y="843">SourcesService · EntitiesService</text>
+    <text class="k" x="668" y="861">P1 · P3 — 0 LLM</text>
+    <text class="m" x="668" y="881">ai đưa tin đầu (DISTINCT ON + publishedAt)</text>
+    <text class="m" x="668" y="897">NER heuristic: cụm viết hoa, freq ≥ 3</text>
+  </g>
+  <g class="node" data-k="s-articles">
+    <rect x="650" y="920" width="350" height="90"/>
+    <text class="t" x="668" y="946">ArticlesService — 5 trụ AI</text>
+    <text class="m" x="668" y="966">summary (cache) · dailyBrief (cache/ngày)</text>
+    <text class="m" x="668" y="982">timeline · compare · suggestQuestions (E3)</text>
+    <text class="m" x="668" y="998">insights: thuần SQL, không LLM</text>
+  </g>
+
+  <!-- ── nodes: services (colR) ────────────── -->
+  <g class="node gate" data-k="s-retrieval">
+    <rect x="1030" y="405" width="370" height="100"/>
+    <text class="t" x="1048" y="431">RetrievalService</text>
+    <text class="k" x="1048" y="449">hybrid · RRF k=60</text>
+    <text class="m" x="1048" y="469">vector (&lt;=&gt;) ∥ full-text (tsvector)</text>
+    <text class="m" x="1048" y="485">fusion + recency boost 0.005 · decay 7 ngày</text>
+    <text class="m" x="1048" y="499">lọc topic tuỳ chọn</text>
+  </g>
+  <g class="node pure" data-k="s-context">
+    <rect x="1030" y="520" width="370" height="85"/>
+    <text class="t" x="1048" y="546">context.builder</text>
+    <text class="k" x="1048" y="564">A3 · scoreConfidence</text>
+    <text class="m" x="1048" y="584">đánh số [1..n] · gom citations theo bài</text>
+    <text class="m" x="1048" y="598">minDistance + số nguồn → cao/TB/thấp</text>
+  </g>
+  <g class="node" data-k="s-llm">
+    <rect x="1030" y="620" width="370" height="100"/>
+    <text class="t" x="1048" y="646">LlmService</text>
+    <text class="m" x="1048" y="666">streamAnswer() · generate() single-shot</text>
+    <text class="m" x="1048" y="682">thử từng model, AbortController 60s</text>
+    <text class="m" x="1048" y="698">chỉ đổi model khi CHƯA phát token nào</text>
+    <text class="m" x="1048" y="712">maxRetries: 0 → fail nhanh</text>
+  </g>
+  <g class="node pure" data-k="s-prompts">
+    <rect x="1030" y="735" width="370" height="80"/>
+    <text class="t" x="1048" y="761">qa.prompt · features.prompts</text>
+    <text class="m" x="1048" y="781">grounding nghiêm: chỉ dùng NGỮ CẢNH</text>
+    <text class="m" x="1048" y="797">rewrite · factCheck · eventAnalysis · recap</text>
+  </g>
+  <g class="node" data-k="s-embed">
+    <rect x="1030" y="830" width="370" height="80"/>
+    <text class="t" x="1048" y="856">EmbeddingService ×2</text>
+    <text class="m" x="1048" y="876">@Optional() baseUrlOverride → 2 instance</text>
+    <text class="m" x="1048" y="892">fail cứng nếu ≠ 1024 chiều</text>
+  </g>
+
+  <!-- ── prisma ────────────────────────────── -->
+  <g class="node" data-k="prisma">
+    <rect x="350" y="1050" width="1070" height="66"/>
+    <text class="t" x="368" y="1078">PrismaService</text>
+    <text class="m" x="368" y="1098">ORM cho CRUD · $queryRaw cho vector / tsvector / thống kê meta (Prisma không có kiểu vector)</text>
+  </g>
+
+  <!-- ── nodes: infra ──────────────────────── -->
+  <g class="node store" data-k="redis">
+    <rect x="1500" y="180" width="340" height="90"/>
+    <text class="t" x="1518" y="206">Redis 7 + BullMQ</text>
+    <text class="m" x="1518" y="226">hàng đợi · retry · cron hoá</text>
+    <text class="m" x="1518" y="242">cổng 6380 (né Redis native 6379)</text>
+    <text class="m" x="1518" y="258">nạp tin không chặn request</text>
+  </g>
+  <g class="node store" data-k="pg">
+    <rect x="1500" y="300" width="340" height="190"/>
+    <text class="t" x="1518" y="326">Postgres 16 + pgvector</text>
+    <text class="k" x="1518" y="344">nguồn sự thật duy nhất</text>
+    <text class="m" x="1518" y="366">Article (topic, summary, questions, eventId)</text>
+    <text class="m" x="1518" y="382">Chunk (embedding vector(1024), contentTsv)</text>
+    <text class="m" x="1518" y="398">Event (sourceCount, hotness, summary)</text>
+    <text class="m" x="1518" y="414">Period · YearReview · DailyBrief</text>
+    <text class="m" x="1518" y="430">Conversation · Message (citations, feedback)</text>
+    <text class="m" x="1518" y="452">HNSW vector_cosine_ops + GIN tsvector</text>
+    <text class="m" x="1518" y="470">dữ liệu không bao giờ xoá — chỉ archive</text>
+  </g>
+  <g class="node store" data-k="ollamaIngest">
+    <rect x="1500" y="520" width="340" height="90"/>
+    <text class="t" x="1518" y="546">Ollama · nạp tin</text>
+    <text class="m" x="1518" y="566">bge-m3 → vector 1024 · :11435</text>
+    <text class="m" x="1518" y="582">Ollama xử lý TUẦN TỰ → phải tách</text>
+    <text class="m" x="1518" y="598">tốn ~1.2GB RAM, tự unload khi rảnh</text>
+  </g>
+  <g class="node store" data-k="ollamaChat">
+    <rect x="1500" y="640" width="340" height="90"/>
+    <text class="t" x="1518" y="666">Ollama · chat</text>
+    <text class="m" x="1518" y="686">bge-m3 → vector 1024 · :11434</text>
+    <text class="m" x="1518" y="702">chỉ embed câu hỏi → luôn rảnh (~1s)</text>
+    <text class="m" x="1518" y="718">cùng model với lúc nạp — bắt buộc</text>
+  </g>
+  <g class="node ext" data-k="openrouter">
+    <rect x="1500" y="760" width="340" height="110"/>
+    <text class="t" x="1518" y="786">OpenRouter</text>
+    <text class="m" x="1518" y="806">openai/gpt-oss-120b:free (chính)</text>
+    <text class="m" x="1518" y="822">openai/gpt-oss-20b:free (dự phòng)</text>
+    <text class="m" x="1518" y="840">:free hay 429 → fallback + timeout</text>
+    <text class="m" x="1518" y="858">CACHE mọi thứ LLM sinh ra</text>
+  </g>
+</svg>
+
+  <div class="src">docs/BUSINESS-FLOW.md · CAI-TIEN.md · CAI-TIEN-V2.md</div>
+
+  <div class="card" id="flowcap">
+    <div class="fname" id="f-name"></div>
+    <ol id="f-steps"></ol>
+  </div>
+
+  <div class="card" id="detail">
+    <h3 id="d-title">Bấm vào bất kỳ khối nào</h3>
+    <div class="meta" id="d-meta">37 thành phần · chi tiết từng service</div>
+    <p id="d-body">Mỗi hộp là một class/route có thật trong repo. Chip phía trên làm mờ phần còn lại và <b>chạy animation đường đi</b> của từng luồng nghiệp vụ.</p>
+  </div>
+</div>
+
+<script>
+const DETAIL = {
+  "p-home":   { t:"/ — Trang chủ", m:"page.tsx · dashboard", b:"Gọi song song <code>/periods/active</code>, <code>/events?from=</code>, <code>/events/developing</code>, <code>/articles</code>, <code>/articles/stats</code>, <code>/insights</code>. Bố cục master–detail: spotlight carousel + bảng xếp hạng nóng bấm chọn." },
+  "p-chat":   { t:"/chat", m:"EventSource · SSE", b:"Nhận <code>token</code> nối dần; sự kiện <code>done</code> mang <b>citations + confidence + messageId</b>. Đọc <code>?q=</code> lúc mount để tự hỏi (từ chip gợi ý ở trang bài)." },
+  "p-factcheck": { t:"/factcheck", m:"kiểm chứng nhận định", b:"Dán một nhận định → thẻ verdict (✅ / ⚠️ / ❓) + phân tích bằng chứng + danh sách <b>nguồn đối chứng</b>." },
+  "p-meta":   { t:"Trang meta báo chí", m:"/sources · /entities · /blindspots", b:"Ba trang <b>không aggregator nào có</b>: hồ sơ từng báo (ai nhanh, mạnh mảng gì), hồ sơ nhân vật/tổ chức tự cập nhật, và radar tin chỉ một nguồn đưa." },
+  "p-event":  { t:"/events/[id]", m:"chi tiết sự kiện", b:"Phân tích <b>đồng thuận / mâu thuẫn</b> giữa các báo (LLM, cache) + dòng thời gian đa nguồn có link bài gốc." },
+  "p-review": { t:"/review · /review/[id]", m:"nhìn lại theo quý", b:"Các quý gom theo năm; mỗi quý có recap AI + điểm nóng + phân bố lĩnh vực. Nút “Năm vừa rồi thế nào?” gộp các quý thành tổng kết năm." },
+  "p-articles": { t:"/articles · /articles/[id]", m:"thư viện + chi tiết bài", b:"Tìm full-text + lọc lĩnh vực. Trang bài có nút <b>Tóm tắt AI</b> (cache) và <b>Gợi ý câu hỏi</b> (E3) → mở <code>/chat?q=…</code>." },
+  "p-brief":  { t:"Bản tin · Timeline · Đối chiếu · Bảng tin", m:"4 trang trụ AI", b:"Bản tin ngày (cache), dòng thời gian sự việc + narrative, so sánh cách các báo đưa tin, và dashboard thống kê (thuần SQL)." },
+
+  sched:      { t:"IngestionScheduler", m:"onModuleInit · BullMQ", b:"Khi app boot: <code>queue.drain()</code> rồi đăng ký job <b>lặp mỗi 30 phút</b> cho từng feed, <code>jobId: feed:{id}</code> nên không nhân bản. Công tắc <code>INGEST_ON_BOOT</code> để tắt khi cần tài nguyên." },
+  processor:  { t:"IngestionProcessor", m:"BullMQ WorkerHost", b:"Nhận job và gọi <code>ingestFeed()</code>. Chạy nền → request người dùng không bao giờ phải chờ nạp tin. Tự retry, <code>removeOnFail: 50</code>." },
+  rss:        { t:"RssService", m:"rss-parser", b:"<code>parseURL</code> → <code>RawFeedItem[]</code> (url, title, source, publishedAt, summaryHtml dự phòng). <b>Cap 60 item/feed</b> vì VietNamNet trả ~1000 item, nạp hết sẽ chiếm worker cả giờ." },
+  extract:    { t:"ContentExtractor + dedup", m:"Readability · AbortController 15s", b:"Bóc text sạch từ HTML gốc. <b>Chống trùng 2 lớp:</b> URL (bỏ ngay, không tốn công bóc) rồi <code>contentHash</code> (bắt bài trùng khác URL). Từng làm sập server vì undici ném lỗi bất đồng bộ → nay có lưới <code>uncaughtException</code>." },
+  chunk:      { t:"ChunkService", m:"~400 token, cắt theo câu", b:"Gom trọn câu tới ~400 token (overlap ~50) — <b>không cắt giữa câu</b> nên embed chuẩn hơn. Chunk nhỏ để (a) embed chính xác, (b) chỉ đưa đúng đoạn liên quan vào prompt." },
+
+  "c-chat":     { t:"ChatController", m:"@Sse", b:"<code>@Sse('stream')</code> biến <code>Observable&lt;MessageEvent&gt;</code> thành luồng SSE — mỗi <code>sub.next()</code> là một dòng <code>data:</code> đẩy về trình duyệt." },
+  "c-events":   { t:"EventsController", m:"GET · POST", b:"<code>GET /events?from=</code> (lọc theo đầu quý), <code>/events/developing</code> (B2), <code>/events/blindspots</code> (P2), <code>/events/:id</code>, và <code>POST /events/cluster</code> (gom cụm thủ công — <b>chưa có cron</b>)." },
+  "c-periods":  { t:"PeriodsController", m:"quản lý quý", b:"<code>/periods/active</code> tự tạo quý hiện tại &amp; archive quý cũ; <code>/periods/:id</code>; <code>/periods/year/:year</code>; <code>POST /periods/rollover</code>." },
+  "c-factcheck":{ t:"FactcheckController", m:"GET /factcheck", b:"Một endpoint duy nhất nhận <code>?claim=</code>. Module import <code>RetrievalModule</code> + <code>LlmModule</code> — tái dùng 100% pipeline RAG." },
+  "c-sources":  { t:"SourcesController", m:"P1", b:"<code>/sources</code> bảng xếp hạng các báo; <code>/sources/:name</code> hồ sơ (decodeURIComponent vì tên có dấu &amp; khoảng trắng)." },
+  "c-entities": { t:"EntitiesController", m:"P3", b:"<code>/entities</code> danh sách thực thể rút từ tiêu đề; <code>/entities/:name</code> hồ sơ tự cập nhật." },
+  "c-articles": { t:"Articles + FeaturesController", m:"thư viện + 5 trụ AI", b:"Route tĩnh khai báo TRƯỚC <code>:id</code> để không bị param nuốt. FeaturesController gắn ở root: <code>/brief</code>, <code>/timeline</code>, <code>/compare</code>, <code>/insights</code>." },
+
+  "s-chat":     { t:"ChatService", m:"điều phối · E1 rewrite", b:"Nếu có <code>conversationId</code> → lấy 4 message gần nhất, LLM <b>viết lại câu hỏi thành truy vấn độc lập</b> (\"còn ông ấy thì sao?\" → tên cụ thể). <b>Best-effort</b>: lỗi/timeout/kết quả bất thường → dùng câu gốc, chat không bao giờ vỡ. Sau đó stream token và lưu <code>Message</code> + citations." },
+  "s-events":   { t:"EventsService", m:"B1 · B2 · P2", b:"<b>cluster()</b>: lấy bài 4 ngày + vector đại diện (chunk <code>ord=0</code>), gom tham lam theo <b>cosine ≥ 0.72</b> — <b>0 LLM</b>. hotness = số báo×3 + số bài + độ mới. <b>getEvent()</b> gọi LLM một lần phân tích đồng thuận/mâu thuẫn rồi cache vào <code>Event.summary</code>. <b>listDeveloping()</b> so với mốc tin mới nhất (không dùng now()). <b>listBlindspots()</b> lọc <code>sourceCount = 1</code>." },
+  "s-periods":  { t:"PeriodsService", m:"quý · recap · năm", b:"<code>getActive()</code> tự tạo quý hiện tại và <b>archive quý cũ</b> (chỉ lưu counts, không LLM). <code>computeStats()</code> tính <b>LIVE theo khoảng ngày</b> — dữ liệu quá khứ đã đóng băng nên không cần snapshot. Recap quý &amp; tổng kết năm sinh bằng LLM rồi cache." },
+  "s-factcheck":{ t:"FactcheckService", m:"A1 · stance", b:"Truy hồi <b>k=12</b> (lấy rộng để có cả bằng chứng phản bác), buộc LLM in dòng đầu <code>VERDICT: supported|conflicting|insufficient</code> rồi tự parse. Không có nguồn → trả <code>insufficient</code> trung thực, <b>không bịa</b>." },
+  "s-meta":     { t:"SourcesService + EntitiesService", m:"P1 · P3 — 0 LLM", b:"<b>P1:</b> <code>DISTINCT ON (event) ORDER BY publishedAt ASC</code> → bài sớm nhất mỗi cụm = báo <b>đưa tin đầu tiên</b>; cộng thêm tin độc quyền &amp; độ phủ lĩnh vực. <b>P3:</b> gom token viết hoa liền nhau trong tiêu đề, lọc stopword đầu câu, giữ cụm xuất hiện <b>≥ 3 lần</b>; hồ sơ = full-text tìm bài nhắc tên." },
+  "s-articles": { t:"ArticlesService", m:"5 trụ AI · cache", b:"Tóm tắt bài → cache <code>Article.summary</code>. Bản tin ngày → cache <code>DailyBrief</code> theo ngày. Timeline/Compare: full-text rồi LLM viết narrative (<b>lỗi vẫn trả data</b>). suggestQuestions (E3) → cache <code>Article.questions</code>. Insights: <b>thuần SQL</b>." },
+
+  "s-retrieval":{ t:"RetrievalService", m:"hybrid · RRF · recency", b:"Chạy song song <b>vector</b> (<code>embedding &lt;=&gt; $vec</code>) và <b>full-text</b> (<code>contentTsv @@ plainto_tsquery</code>), mỗi bên pool 20, hợp nhất bằng <b>Reciprocal Rank Fusion</b> (k=60). Cộng nhẹ điểm mới (hệ số 0.005, phân rã 7 ngày) — tin mới thắng khi độ liên quan tương đương, nhưng không lấn át relevance." },
+  "s-context":  { t:"context.builder", m:"hàm thuần · unit-tested", b:"Đánh số đoạn <code>[1..n]</code> và gom citations <b>theo bài</b> (mỗi bài một nguồn dù nhiều chunk). <b>A3 scoreConfidence:</b> <code>minDistance</code> (cosine gần nhất) + số nguồn độc lập → cao / trung bình / thấp. Chính là <code>distance</code> mà trước đây bị vứt đi." },
+  "s-llm":      { t:"LlmService", m:"stream + fallback thủ công", b:"Thử từng model theo thứ tự, mỗi lần bọc <code>AbortController</code> timeout 60s; <b>chỉ chuyển model khi chưa phát token nào</b> (không thể restart giữa chừng). Bỏ <code>withFallbacks</code> vì nó <b>treo</b> khi primary 429. <code>generate()</code> là bản single-shot cho summary/brief/recap/factcheck." },
+  "s-prompts":  { t:"qa.prompt + features.prompts", m:"grounding nghiêm", b:"“CHỈ trả lời dựa trên NGỮ CẢNH… không tìm thấy thì nói không tìm thấy… luôn trích [số]… không bịa.” Các prompt khác: rewriteFollowup, factCheck (stance), eventAnalysis, periodRecap, yearReview, suggestQuestions." },
+  "s-embed":    { t:"EmbeddingService ×2", m:"bge-m3 · 1024 chiều", b:"Một class, <b>hai instance</b> qua <code>@Optional() baseUrlOverride</code> + token DI <code>EMBEDDING_INGEST</code>. <b>Fail cứng</b> nếu vector ≠ 1024 chiều để không làm hỏng cột <code>vector(1024)</code>. Cạm bẫy: param string khiến Nest tưởng là dependency → phải <code>@Optional()</code>." },
+
+  prisma:     { t:"PrismaService", m:"ORM + $queryRaw", b:"CRUD đi qua Prisma; nhưng <b>Prisma không có kiểu vector</b> nên mọi thứ chạm pgvector/tsvector/thống kê meta đều dùng <code>$queryRaw</code> có tham số hoá. Ghi Chunk phải tự sinh <code>cuid2</code> vì raw INSERT không qua <code>@default</code>." },
+
+  redis:      { t:"Redis 7 + BullMQ", m:"hàng đợi · cron", b:"Cho phép nạp tin chạy <b>nền, tự retry, cron hoá</b>. Chạy cổng <b>6380</b> vì Redis native 3.0.504 trên máy giữ 6379." },
+  pg:         { t:"Postgres 16 + pgvector", m:"nguồn sự thật duy nhất", b:"Một DB giữ tất cả. <b>HNSW</b> (vector_cosine_ops) cho vector, <b>GIN</b> cho tsvector. Bảng <code>Event</code>/<code>Period</code>/<code>YearReview</code> được áp bằng <b>raw SQL</b> vào DB đang chạy (không <code>prisma migrate</code>) để khỏi reset dev DB. Dữ liệu <b>không bao giờ bị xoá</b> — sang quý mới chỉ archive." },
+  ollamaIngest:{ t:"Ollama · nạp tin (:11435)", m:"container riêng", b:"Ollama xử lý request <b>tuần tự</b>. Khi dùng chung một instance, ingestion embed hàng loạt đẩy độ trễ embed câu hỏi từ ~0.6s lên <b>16–28s</b> → <code>/chat/stream</code> timeout. Tách container thứ hai là cách rẻ nhất để chữa (đổi lại ~1.2GB RAM)." },
+  ollamaChat: { t:"Ollama · chat (:11434)", m:"độ trễ thấp", b:"Chỉ embed câu hỏi lúc truy hồi → luôn rảnh, ~1s. <b>Bắt buộc cùng model bge-m3</b> với lúc nạp: khác model thì vector không so sánh được và cả DB phải embed lại." },
+  openrouter: { t:"OpenRouter", m:"ngoài hệ thống · free-tier", b:"Model <code>:free</code> hay 429 và bị đổi/gỡ liên tục (deepseek-chat-v3 đã bị gỡ). Vì vậy: fallback thủ công + timeout, và <b>cache mọi thứ LLM sinh ra</b> — tóm tắt bài, bản tin ngày, phân tích sự kiện, recap quý, gợi ý câu hỏi." },
+};
+
+const FLOWS = {
+  ingest: {
+    name: "Nạp tin — nền, định kỳ, không chặn ai",
+    edges: ["e-sched-redis","e-sched-proc","e-proc-rss","e-rss-extract","e-extract-chunk","e-chunk-embed","e-embed-ollamaIngest","e-chunk-prisma","e-prisma-pg"],
+    nodes: ["sched","processor","rss","extract","chunk","s-embed","redis","ollamaIngest","prisma","pg"],
+    steps: [
+      "Scheduler đăng ký job <b>lặp mỗi 30′</b> cho từng feed vào BullMQ (Redis)",
+      "Worker tải RSS → bóc text (Readability) → <b>chống trùng URL rồi contentHash</b>",
+      "Cắt đoạn ~400 token <b>theo câu</b> → embed cả lô trên Ollama <code>:11435</code>",
+      "Ghi <code>Article</code> + N <code>Chunk(vector 1024)</code> trong <b>một transaction</b>"
+    ]
+  },
+  rag: {
+    name: "Hỏi–đáp RAG — có trích dẫn và độ tin cậy",
+    edges: ["e-chat-ui","e-cchat-schat","e-schat-sret","e-sret-sembed","e-embed-ollamaChat","e-sret-scontext","e-ret-prisma","e-prisma-pg","e-schat-sllm","e-prompts-llm","e-llm-openrouter","e-chat-prisma"],
+    nodes: ["p-chat","c-chat","s-chat","s-retrieval","s-embed","ollamaChat","s-context","prisma","pg","s-llm","s-prompts","openrouter"],
+    steps: [
+      "SSE <code>/chat/stream</code>. Câu nối tiếp → <b>E1 viết lại thành truy vấn độc lập</b>",
+      "Embed câu hỏi (<code>:11434</code>) → vector ∥ full-text, hợp nhất <b>RRF</b> + recency",
+      "<code>context.builder</code>: đánh số đoạn, gom citations, <b>A3 chấm độ tin cậy</b>",
+      "Prompt grounding nghiêm → LLM stream token; lưu <code>Message</code> + citations"
+    ]
+  },
+  intel: {
+    name: "Trí tuệ sự kiện — thứ aggregator không có",
+    edges: ["e-home-events","e-event-ui","e-meta-blind","e-cevents-sevents","e-events-llm","e-prompts-llm","e-llm-openrouter","e-events-prisma","e-prisma-pg"],
+    nodes: ["p-home","p-event","p-meta","c-events","s-events","s-llm","s-prompts","openrouter","prisma","pg"],
+    steps: [
+      "<code>cluster()</code>: gom bài xuyên báo bằng <b>cosine ≥ 0.72</b> trên vector đại diện — <b>0 LLM</b>",
+      "hotness = số báo×3 + số bài + độ mới; <b>developing</b> = còn cập nhật + trải theo thời gian",
+      "Mở <code>/events/:id</code> → LLM phân tích <b>đồng thuận / mâu thuẫn</b> một lần rồi <b>cache</b>",
+      "<code>listBlindspots()</code> lọc <code>sourceCount = 1</code> → scoop hoặc chưa kiểm chứng chéo"
+    ]
+  },
+  periods: {
+    name: "Lưu trữ quý — giữ hết, chỉ archive",
+    edges: ["e-home-periods","e-review-ui","e-cperiods-speriods","e-periods-llm","e-prompts-llm","e-llm-openrouter","e-periods-prisma","e-prisma-pg"],
+    nodes: ["p-home","p-review","c-periods","s-periods","s-llm","s-prompts","openrouter","prisma","pg"],
+    steps: [
+      "<code>getActive()</code> tự tạo quý hiện tại và <b>archive</b> quý cũ (chỉ counts, không LLM)",
+      "Trang chủ hiện “Tin tức cập nhật từ ngày…” = <code>startDate</code> quý → để kiểm chứng",
+      "Quý đã archive → LLM viết <b>recap</b> (tổng quan · điểm nóng · xu hướng), cache lại",
+      "Cuối năm gộp các recap quý → “<b>Năm vừa rồi là một năm như thế nào?</b>”"
+    ]
+  },
+  factcheck: {
+    name: "Kiểm chứng — đối chứng cả hai phía",
+    edges: ["e-fc-ui","e-cfc-sfc","e-fc-ret","e-sret-sembed","e-embed-ollamaChat","e-sret-scontext","e-ret-prisma","e-prisma-pg","e-fc-llm","e-prompts-llm","e-llm-openrouter"],
+    nodes: ["p-factcheck","c-factcheck","s-factcheck","s-retrieval","s-embed","ollamaChat","s-context","prisma","pg","s-llm","s-prompts","openrouter"],
+    steps: [
+      "Dán một nhận định vào <code>/factcheck</code>",
+      "Truy hồi <b>k=12</b> — lấy rộng để có <b>cả bằng chứng phản bác</b>",
+      "LLM phân loại lập trường: <code>supported</code> / <code>conflicting</code> / <code>insufficient</code>",
+      "Trả verdict + phân tích + <b>nguồn đối chứng</b>. Thiếu dữ liệu thì nói thẳng, không bịa"
+    ]
+  },
+  meta: {
+    name: "Meta báo chí — phân tích chính báo chí (0 LLM)",
+    edges: ["e-meta-sources","e-meta-entities","e-meta-blind","e-csources-smeta","e-centities-smeta","e-cevents-sevents","e-meta-prisma","e-events-prisma","e-prisma-pg"],
+    nodes: ["p-meta","c-sources","c-entities","c-events","s-meta","s-events","prisma","pg"],
+    steps: [
+      "<b>P1:</b> bài sớm nhất mỗi cụm đa nguồn → <b>% đưa tin đầu tiên</b> (VnExpress 78%)",
+      "<b>P2:</b> lọc cụm <code>sourceCount = 1</code> → tin độc quyền hoặc chưa kiểm chứng chéo",
+      "<b>P3:</b> rút cụm danh từ riêng từ tiêu đề (freq ≥ 3) → hồ sơ thực thể tự cập nhật",
+      "Tất cả chỉ <b>SQL + heuristic</b> — rẻ, tức thì, không phụ thuộc LLM"
+    ]
+  },
+  pillars: {
+    name: "Trụ AI — tóm tắt, bản tin, timeline, đối chiếu, insight",
+    edges: ["e-brief-ui","e-articles-ui","e-carticles-sarticles","e-articles-llm","e-prompts-llm","e-llm-openrouter","e-articles-prisma","e-prisma-pg"],
+    nodes: ["p-brief","p-articles","c-articles","s-articles","s-llm","s-prompts","openrouter","prisma","pg"],
+    steps: [
+      "Tóm tắt bài → cache <code>Article.summary</code>; gợi ý câu hỏi (E3) → cache <code>Article.questions</code>",
+      "Bản tin ngày → cache theo ngày (<code>DailyBrief</code>)",
+      "Timeline / Đối chiếu: full-text tìm bài rồi LLM viết narrative (<b>lỗi vẫn trả data</b>)",
+      "Insights: <b>thuần SQL</b> — bài/ngày, top nguồn, từ khóa nổi (lọc stopword tiếng Việt)"
+    ]
+  }
+};
+
+const stage = document.getElementById('stage');
+const nodes = document.querySelectorAll('.node');
+const edges = document.querySelectorAll('.edge');
+const elbls = document.querySelectorAll('.elbl');
+const chips = document.querySelectorAll('.chip');
+const fcap  = document.getElementById('flowcap');
+
+function setFlow(key) {
+  chips.forEach(c => c.classList.toggle('on', c.dataset.flow === key));
+  edges.forEach(e => e.classList.remove('lit'));
+  elbls.forEach(l => l.classList.remove('lit'));
+  nodes.forEach(n => n.classList.remove('lit'));
+  if (key === 'all') { stage.classList.remove('flowing'); fcap.classList.remove('show'); return; }
+  const f = FLOWS[key];
+  stage.classList.add('flowing');
+  f.edges.forEach(id => document.getElementById(id)?.classList.add('lit'));
+  elbls.forEach(l => { if (f.edges.includes(l.dataset.e)) l.classList.add('lit'); });
+  f.nodes.forEach(k => document.querySelector(`.node[data-k="${k}"]`)?.classList.add('lit'));
+  document.getElementById('f-name').textContent = f.name;
+  document.getElementById('f-steps').innerHTML = f.steps.map(s => `<li>${s}</li>`).join('');
+  fcap.classList.add('show');
+}
+chips.forEach(c => c.addEventListener('click', () => setFlow(c.dataset.flow)));
+
+nodes.forEach(n => n.addEventListener('click', () => {
+  nodes.forEach(x => x.classList.remove('sel'));
+  n.classList.add('sel');
+  const d = DETAIL[n.dataset.k];
+  if (!d) return;
+  document.getElementById('d-title').textContent = d.t;
+  document.getElementById('d-meta').textContent = d.m;
+  document.getElementById('d-body').innerHTML = d.b;
+}));
+
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const dark = !document.documentElement.classList.contains('dark');
+  document.documentElement.classList.toggle('dark', dark);
+  localStorage.setItem('theme', dark ? 'dark' : 'light');
+});
+</script>
+</body>
+</html>

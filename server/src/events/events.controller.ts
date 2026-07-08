@@ -19,6 +19,11 @@ export class EventsController {
     return this.events.listDeveloping();
   }
 
+  @Get('blindspots')
+  blindspots() {
+    return this.events.listBlindspots();
+  }
+
   @Post('cluster')
   cluster() {
     return this.events.cluster();
