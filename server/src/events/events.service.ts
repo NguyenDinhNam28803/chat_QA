@@ -254,7 +254,12 @@ export class EventsService {
         .join('\n');
       try {
         const { system, user } = eventAnalysisPrompt(event.title, block);
-        summary = (await this.llm.generate(system, user)).trim();
+        summary = (
+          await this.llm.generate(system, user, {
+            feature: 'event',
+            tier: 'reasoning',
+          })
+        ).trim();
         await this.prisma.event.update({ where: { id }, data: { summary } });
       } catch {
         /* analysis optional */

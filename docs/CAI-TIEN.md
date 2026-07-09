@@ -6,6 +6,24 @@
 
 ---
 
+## CT-29 · B1 định tuyến model + B3 đo token + B4 fact-check web — 2026-07-04
+
+Ba hướng OpenRouter (xem [OPENROUTER.md](OPENROUTER.md)).
+- **B1 · Model tiering:** `LlmService` có **tier `nano|standard|reasoning`**, mỗi tier là một **chuỗi slug** (tier → primary → fallback, dedup). Env tuỳ chọn `LLM_MODEL_{NANO,STANDARD,REASONING}` (mặc định: reasoning=primary 120b, standard/nano=fallback 20b → hành vi cũ, nhưng việc nhẹ chuyển sang 20b để **tán tải, ít 429**). `modelBySlug` map + xây instance/slug. Gán tier cho caller: rewrite/suggest=**nano**, summary/brief/timeline=**standard**, chat/factcheck/compare/event/recap/year=**reasoning**.
+- **B3 · Usage accounting:** bảng `LlmUsage` (feature, model, in/out tokens, cost) — raw SQL + prisma generate. `UsageModule` (record fire-and-forget + `GET /usage` gộp 30 ngày theo feature/model). Bắt token: stream (`streamUsage:true` → `usage_metadata`) và fetch (`usage:{include:true}` → `data.usage`). Thread `{feature,tier}` qua generate/streamAnswer/generateStructured/generateWeb. Panel "Chi phí AI · token" trên **/dashboard**.
+- **B4 · Fact-check web:** `LlmService.generateWeb()` gọi OpenRouter `plugins:[{id:'web'}]` (1 lần, không loop vì web tốn phí) trả text + `webSources`. `FactcheckService.checkOnline()` (bỏ qua corpus, nhãn "nguồn ngoài, chưa kiểm duyệt"), `GET /factcheck/online?claim=`. FE `/factcheck`: nút **"🌐 Kiểm chứng mở rộng ngoài web"** (opt-in, tách khỏi luồng grounded). **Lưu ý:** model `:free` hiện chưa dùng được web plugin → degrade an toàn kèm thông báo (cần model/credits hỗ trợ web).
+- **Verify:** BE tsc+lint 0 · Docker rebuild BE+FE · `/usage` gộp đúng (factcheck 3.9k tok, summary 2.1k tok); summary(standard)→20b thẳng, factcheck(reasoning)→120b rớt 20b (đúng tiering+fallback); `/dashboard` + `/factcheck` render 200; nút web trả thông báo an toàn.
+
+## CT-28 · B2 · Structured Output (JSON Schema) cho Fact-check — 2026-07-04
+
+Triển khai hướng B2 trong [OPENROUTER.md](OPENROUTER.md): buộc model trả JSON theo schema thay vì parse `VERDICT:` bằng regex.
+- **`LlmService.generateStructured<T>()`** (mới): gọi **thẳng OpenRouter** bằng `fetch` `POST /chat/completions` với `response_format: { type:'json_schema', json_schema:{ strict:true, schema } }` — vì `.bind()` không có trên type ChatOpenAI của bản LangChain này, và fetch đảm bảo `response_format` được gửi. Fallback thủ công qua `slugs` + `AbortController` 60s. `extractJson()` bóc `{…}` (strip code fence). Constructor lưu thêm `apiKey/baseURL/attrHeaders/slugs`.
+- **`factCheckStructuredPrompt` + `factCheckSchema`** (features.prompts.ts): schema `{ verdict: enum, confidence: number 0..1, analysis: string }`.
+- **`FactcheckService`**: thử structured trước → validate verdict∈enum → dùng `confidence` (clamp 0..1); **fallback về text `generate()` + regex cũ** nếu model free không tôn trọng schema. `FactCheckResult` thêm `confidence: number | null`.
+- **FE `/factcheck`**: hiện "độ chắc chắn N%" cạnh verdict khi có confidence.
+- **Lợi ích:** xoá phụ thuộc regex mong manh (điểm yếu A.3 #2), **miễn phí thêm confidence**, và **chất lượng verdict tăng**.
+- **Verify:** BE tsc+lint 0 · Docker rebuild BE+FE · gpt-oss **tôn trọng json_schema**: "Vietnam Airlines có lãi" → supported/95%; "giá vàng giảm" → insufficient/0%. `/factcheck` render 200.
+
 ## CT-27 · Tái cấu trúc trang chủ theo dashboard chuyên nghiệp — 2026-07-04
 
 Trang chủ trước là chuỗi section xếp dọc đơn điệu → sắp lại theo **bố cục dashboard/bento có phân cấp** (hợp design IoT Home "smart-home dashboard").

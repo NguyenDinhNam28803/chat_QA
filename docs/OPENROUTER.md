@@ -55,8 +55,8 @@ Cấu hình qua `.env` (xem [`server/.env.example`](../server/.env.example)):
 |---|---|---|
 | `OPENROUTER_API_KEY` | *(bắt buộc)* | Khoá OpenRouter |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Endpoint |
-| `LLM_PRIMARY_MODEL` | `qwen/qwen3-next-80b-a3b-instruct:free` | Model chính |
-| `LLM_FALLBACK_MODEL` | `meta-llama/llama-3.3-70b-instruct:free` | Model dự phòng (khi 429) |
+| `LLM_PRIMARY_MODEL` | `openai/gpt-oss-120b:free` | Model chính (qwen/llama trước đây hay 429 → đã đổi) |
+| `LLM_FALLBACK_MODEL` | `openai/gpt-oss-20b:free` | Model dự phòng (khi 429) |
 | `APP_PUBLIC_URL` / `APP_TITLE` | — | Header attribution |
 
 Cơ chế phòng thủ then chốt (`streamMessages`):
@@ -105,7 +105,10 @@ Chỉ có **2 phương thức public** chạm OpenRouter:
 
 Mỗi hướng gồm: **Chuyên ngành** (thuật ngữ) → **Ví von** → **Ví dụ trong NewsQA**.
 
-### B1. Định tuyến model theo tác vụ *(model tiering / router)*
+### B1. Định tuyến model theo tác vụ *(model tiering / router)* ✅ ĐÃ TRIỂN KHAI (CT-29)
+
+> **Trạng thái:** `LlmService` có tier `nano|standard|reasoning`; mỗi caller gán tier + feature. Env `LLM_MODEL_{NANO,STANDARD,REASONING}` tuỳ chọn; mặc định việc nhẹ→20b, việc nặng→120b → tán tải 429.
+
 
 **Chuyên ngành.** Mẫu hình **"model cascade" / "LLM router"**: ánh xạ *độ khó tác vụ → cấp năng lực model* (capability tier). Nền tảng: token cost & latency tỷ lệ thuận với kích thước model, nên đưa việc dễ cho model nhỏ tối ưu **cost/performance ratio**. OpenRouter khiến việc này *trivial* vì mọi model gọi qua **cùng API, chỉ khác chuỗi `slug`**.
 
@@ -128,7 +131,10 @@ SAU:    rewrite ───► mistral-small (nano) ~0.1s, gần như miễn phí
 
 Trong code chỉ cần `generate(system, user, { tier })` + bảng ánh xạ `tier → slug`. Lợi ích kép: **rẻ hơn** + **tán tải nên ít 429 hơn**.
 
-### B2. Structured Output — buộc model trả JSON theo khuôn
+### B2. Structured Output — buộc model trả JSON theo khuôn ✅ ĐÃ TRIỂN KHAI (CT-28)
+
+> **Trạng thái:** đã áp cho fact-check. `LlmService.generateStructured()` gọi thẳng OpenRouter với `response_format: json_schema`; `FactcheckService` dùng schema `{verdict, confidence, analysis}`, có **fallback** về regex cũ nếu model free không tôn trọng schema. Đã xoá phụ thuộc regex + thêm `confidence`. Verified: gpt-oss tôn trọng schema.
+
 
 **Chuyên ngành.** LLM bình thường sinh văn bản tự do. **Structured output** ép đầu ra tuân **JSON Schema**; kỹ thuật lõi là **constrained decoding** — chỉ sinh token hợp lệ với schema nên *đảm bảo* parse được. OpenRouter dùng `response_format: { type: 'json_schema' }` + `provider: { require_parameters: true }` (chỉ chọn provider hỗ trợ).
 
@@ -145,7 +151,10 @@ Sau khi dùng JSON Schema, model bắt buộc trả:
 ```
 → Xoá regex, **không bao giờ parse lỗi**, *miễn phí* thêm `confidence` (chính là "nhãn độ tin cậy"). Áp được cho **phân loại topic** và **quyết định gộp cụm sự kiện**.
 
-### B3. Đo lường token & chi phí *(usage accounting / FinOps)*
+### B3. Đo lường token & chi phí *(usage accounting / FinOps)* ✅ ĐÃ TRIỂN KHAI (CT-29)
+
+> **Trạng thái:** bảng `LlmUsage` + `UsageModule` + `GET /usage`; bắt token qua `streamUsage` (stream) và `usage:{include:true}` (fetch). Panel "Chi phí AI · token theo tính năng" trên `/dashboard`.
+
 
 **Chuyên ngành.** Mỗi lời gọi trả khối **`usage`** (`prompt_tokens`, `completion_tokens`, `cost`); bật bằng `usage: { include: true }`, tra sau qua endpoint `/generation`. Nền của **LLM observability** và **cost attribution** (FinOps cho AI). *Không đo thì không tối ưu được.*
 
@@ -161,7 +170,10 @@ compare      | reasoning |   4,100   |      510       | 0.0034   | false  ← ng
 ```
 → Phát hiện `compare`/`factcheck` không cache = ứng viên số 1 để thêm cache. **Điều kiện bắt buộc** trước khi lên model trả phí hoặc bán B2B.
 
-### B4. Fact-check "online" — tra cứu web thời gian thực
+### B4. Fact-check "online" — tra cứu web thời gian thực ✅ ĐÃ TRIỂN KHAI (CT-29)
+
+> **Trạng thái:** `generateWeb()` (plugin `web`) + `GET /factcheck/online` + nút "🌐 Kiểm chứng mở rộng ngoài web" (opt-in, nhãn nguồn ngoài). **Lưu ý:** model `:free` hiện chưa dùng được web plugin nên degrade an toàn — cần model/credits hỗ trợ web để chạy thật.
+
 
 **Chuyên ngành.** Thêm hậu tố **`:online`** vào slug (hoặc `web` plugin) → model được cấp công cụ web search, tự truy vấn khi cần. Bản chất là mở rộng tri thức từ *corpus đóng* sang *web mở* — đụng tới **grounding boundary** (ranh giới "AI chỉ nói dựa nguồn nào").
 

@@ -15,6 +15,7 @@ interface Citation {
 interface Result {
   claim: string;
   verdict: 'supported' | 'conflicting' | 'insufficient';
+  confidence: number | null;
   analysis: string;
   citations: Citation[];
 }
@@ -30,10 +31,17 @@ const EXAMPLES = [
   'Giá vàng trong nước đang giảm mạnh',
 ];
 
+interface WebResult {
+  analysis: string;
+  webSources: { url: string; title: string }[];
+}
+
 export default function FactcheckPage() {
   const [claim, setClaim] = useState('');
   const [data, setData] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
+  const [web, setWeb] = useState<WebResult | null>(null);
+  const [webLoading, setWebLoading] = useState(false);
 
   function run(e: React.FormEvent) {
     e.preventDefault();
@@ -41,6 +49,7 @@ export default function FactcheckPage() {
     if (!q || loading) return;
     setLoading(true);
     setData(null);
+    setWeb(null);
     void (async () => {
       try {
         const res = await fetch(`${API}/factcheck?claim=${encodeURIComponent(q)}`);
@@ -49,6 +58,21 @@ export default function FactcheckPage() {
         /* ignore */
       } finally {
         setLoading(false);
+      }
+    })();
+  }
+
+  function checkWeb() {
+    if (!data || webLoading) return;
+    setWebLoading(true);
+    void (async () => {
+      try {
+        const res = await fetch(`${API}/factcheck/online?claim=${encodeURIComponent(data.claim)}`);
+        if (res.ok) setWeb(await res.json());
+      } catch {
+        /* ignore */
+      } finally {
+        setWebLoading(false);
       }
     })();
   }
@@ -122,7 +146,7 @@ export default function FactcheckPage() {
               }`}
             >
               <span className="text-2xl">{v.icon}</span>
-              <div>
+              <div className="flex-1">
                 <p className="label">Kết luận</p>
                 <p
                   className={`font-display text-lg font-bold ${v.accent ? 'text-accent' : 'text-fg'}`}
@@ -130,6 +154,14 @@ export default function FactcheckPage() {
                   {v.label}
                 </p>
               </div>
+              {data.confidence !== null && (
+                <div className="text-right">
+                  <div className="font-display text-2xl font-extrabold tabular-nums leading-none text-fg">
+                    {Math.round(data.confidence * 100)}%
+                  </div>
+                  <div className="label mt-1">độ chắc chắn</div>
+                </div>
+              )}
             </div>
 
             {/* Analysis */}
@@ -164,6 +196,50 @@ export default function FactcheckPage() {
                 </div>
               </div>
             )}
+
+            {/* B4 — explicit web-augmented check (external, unverified) */}
+            <div className="mt-6 border-t border-white/10 pt-5">
+              {!web ? (
+                <button
+                  onClick={checkWeb}
+                  disabled={webLoading}
+                  className="rounded-md border border-white/15 px-3 py-1.5 text-sm transition hover:border-accent hover:text-accent disabled:opacity-50"
+                >
+                  {webLoading ? 'Đang tra web…' : '🌐 Kiểm chứng mở rộng ngoài web'}
+                </button>
+              ) : (
+                <div className="rounded-lg border border-accent/40 bg-surface p-5">
+                  <p className="label mb-3 text-accent">
+                    🌐 Kết quả từ web · nguồn ngoài, chưa kiểm duyệt
+                  </p>
+                  {web.analysis ? (
+                    <Markdown>{web.analysis}</Markdown>
+                  ) : (
+                    <p className="text-sm text-muted">Không có kết quả.</p>
+                  )}
+                  {web.webSources.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {web.webSources.map((s) => (
+                        <a
+                          key={s.url}
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="max-w-xs truncate border border-white/10 px-2 py-1 text-xs text-muted transition hover:border-accent hover:text-accent"
+                        >
+                          ↗ {s.title}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!web && (
+                <p className="label mt-2 text-muted">
+                  Tra cứu web tách khỏi kho tin nội bộ — dùng khi kho chưa đủ dữ liệu.
+                </p>
+              )}
+            </div>
           </div>
         )}
       </main>

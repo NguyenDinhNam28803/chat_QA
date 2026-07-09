@@ -255,7 +255,12 @@ export class PeriodsService {
       return { year, content: '', quarters: quarters.map(this.qLite) };
     }
     const { system, user } = yearReviewPrompt(year, blocks.join('\n\n'));
-    const content = (await this.llm.generate(system, user)).trim();
+    const content = (
+      await this.llm.generate(system, user, {
+        feature: 'year',
+        tier: 'reasoning',
+      })
+    ).trim();
     await this.prisma.yearReview.create({ data: { year, content } });
     return { year, content, quarters: quarters.map(this.qLite) };
   }
@@ -287,7 +292,12 @@ export class PeriodsService {
         eventsBlock,
         topicBlock,
       );
-      return (await this.llm.generate(system, user)).trim();
+      return (
+        await this.llm.generate(system, user, {
+          feature: 'recap',
+          tier: 'reasoning',
+        })
+      ).trim();
     } catch {
       return '';
     }

@@ -8,8 +8,9 @@
 > - **PHA C — Tính năng AI** (5 trụ): tóm tắt, bản tin ngày, dòng thời gian, đối chiếu, insight — sinh single-shot + cache.
 > - **PHA D — Trí tuệ sự kiện**: gom bài đa nguồn thành sự kiện + phân tích đồng thuận/mâu thuẫn.
 > - **PHA E — Lưu trữ theo quý & Nhìn lại**: tổng kết điểm nóng theo quý/năm.
+> - **PHA F — Meta báo chí, Kiểm chứng & Tối ưu LLM**: hồ sơ nguồn/thực thể, điểm mù, độ tin cậy, fact-check (structured/web), tiering + đo token.
 >
-> PHA A–B là lõi RAG; C–D–E là các lớp "news intelligence" thêm sau (xem [CAI-TIEN.md](CAI-TIEN.md)).
+> PHA A–B là lõi RAG; C–D–E–F là các lớp "news intelligence" thêm sau (xem [CAI-TIEN.md](CAI-TIEN.md), [OPENROUTER.md](OPENROUTER.md)).
 
 ---
 
@@ -589,6 +590,47 @@ Client component gọi song song `/periods/active`, `/events?from=<đầu quý>`
 - **Carousel Điểm nóng** (tự xoay 5s, thanh tiến trình, badge nguồn xếp chồng + sparkline nhịp bài).
 - **Lưới sự kiện** + **chip từ khóa nổi** (→ `/timeline`) + **dòng tin mới** (agenda).
 
+> Bố cục hiện tại là **dashboard master–detail**: KPI tiles → spotlight carousel + bảng xếp hạng nóng (bấm để chọn) → dải "Đang phát triển" → lưới sự kiện + rail (từ khóa + công cụ) → dòng tin.
+
+---
+
+# PHA F — META BÁO CHÍ, KIỂM CHỨNG & TỐI ƯU LLM
+
+Lớp "trí tuệ meta" — phân tích *chính báo chí* + tăng độ tin cậy, phần lớn **không tốn LLM**.
+
+## F1. Radar điểm mù *(P2)* — `events.service.ts`
+Đảo ngược điểm nóng: lọc cụm **chỉ một nguồn** đưa tin → scoop hoặc chưa kiểm chứng chéo.
+```ts
+listBlindspots(limit = 30) // where sourceCount == 1, orderBy lastSeen desc
+```
+`GET /events/blindspots` → trang `/blindspots`. **0 LLM.**
+
+## F2. Hồ sơ nguồn tin *(P1)* — `sources.service.ts`
+Ai **đưa tin đầu tiên** (bài sớm nhất trong mỗi cụm đa nguồn), tin độc quyền, độ phủ lĩnh vực — **thuần SQL**.
+```sql
+WITH firsts AS (
+  SELECT DISTINCT ON (e.id) e.id, a.source
+  FROM "Event" e JOIN "Article" a ON a."eventId" = e.id
+  WHERE e."sourceCount" >= 2 AND a."publishedAt" IS NOT NULL
+  ORDER BY e.id, a."publishedAt" ASC   -- bài sớm nhất = báo đưa đầu
+) SELECT source, count(*) FROM firsts GROUP BY source
+```
+`GET /sources`, `/sources/:name` → `/sources` + `/sources/[name]`.
+
+## F3. Hồ sơ thực thể *(P3)* — `entities.service.ts`
+NER **heuristic** (0 LLM): gom cụm token viết hoa trong tiêu đề, giữ cụm xuất hiện ≥ 3 lần; hồ sơ = full-text tìm bài nhắc tên. `GET /entities`, `/entities/:name`.
+
+## F4. Nhãn độ tin cậy *(A3)* — `context.builder.ts`
+`scoreConfidence(minDistance, sources)` từ khoảng cách cosine + số nguồn → đẩy vào SSE `done`, hiện badge ở `/chat`. Tận dụng `distance` vốn bị bỏ.
+
+## F5. Kiểm chứng *(A1 + B2 + B4)* — `factcheck.service.ts`
+- **B2 structured:** `LlmService.generateStructured()` buộc model trả JSON theo `json_schema` `{verdict, confidence, analysis}` — bỏ regex, thêm confidence; **fallback** regex nếu model free không hỗ trợ.
+- **B4 web:** `checkOnline()` (plugin `web`) — opt-in, nhãn "nguồn ngoài", tách khỏi luồng grounded. `GET /factcheck`, `/factcheck/online`.
+
+## F6. Tối ưu LLM *(B1 tiering + B3 usage)* — `llm.service.ts`, `usage.service.ts`
+- **B1:** tier `nano|standard|reasoning` → chuỗi slug; việc nhẹ→20b, việc khó→120b (rẻ + tán tải 429). Mỗi caller `generate(sys,usr,{feature,tier})`.
+- **B3:** mỗi lời gọi LLM ghi `LlmUsage` (token/model/feature) qua `UsageService` (fire-and-forget); `GET /usage` → panel "Chi phí AI · token" trên `/dashboard`.
+
 ---
 
 # Sơ đồ Mermaid
@@ -644,6 +686,66 @@ sequenceDiagram
     CHAT->>PG: insert Message(assistant + citations)
     CHAT-->>UI: data: {"done": true, citations, conversationId}
     UI->>UI: render câu trả lời + link nguồn
+```
+
+## PHA C — Tính năng AI (5 trụ · sinh + cache)
+
+```mermaid
+flowchart TD
+    Req["Yêu cầu<br/>summary · brief · timeline · compare"] --> Cache{"Đã cache?"}
+    Cache -- "có" --> Hit["Trả cache<br/>Article.summary · DailyBrief"]
+    Cache -- "không" --> Gen["LlmService.generate()<br/>single-shot (tier standard)"]
+    Gen --> OR["🌐 OpenRouter"]
+    OR --> Save["Lưu cache + trả kết quả"]
+    Ins["insights (bài/ngày · nguồn · từ khóa)"] -.->|"THUẦN SQL · 0 LLM"| PG[("Postgres")]
+```
+
+## PHA D — Trí tuệ sự kiện (gom cụm + đồng thuận)
+
+```mermaid
+flowchart TD
+    Cluster["POST /events/cluster"] --> Fetch["Bài 4 ngày + vector chunk ord0"]
+    Fetch --> Cos["cosine ≥ 0.72<br/>gom tham lam · 0 LLM"]
+    Cos --> Ev[("Event<br/>sourceCount · hotness")]
+    Ev --> Hot["/events · /developing · /blindspots"]
+    Ev --> Det["/events/:id"]
+    Det --> LLM["🌐 LLM đồng thuận / mâu thuẫn"]
+    LLM --> CacheE[("cache Event.summary")]
+```
+
+## PHA E — Lưu trữ theo quý & Nhìn lại
+
+```mermaid
+flowchart TD
+    Active["GET /periods/active"] --> Cur{"Quý hiện tại có?"}
+    Cur -- "chưa" --> New["tạo Period (active)"]
+    Cur -- "có quý cũ đang active" --> Arc["archive (snapshot counts · 0 LLM)"]
+    Active --> Stats["computeStats() LIVE theo khoảng ngày"]
+    Det["GET /periods/:id (đã archive)"] --> Recap["🌐 LLM recap quý"]
+    Recap --> CR[("cache Period.summary")]
+    Year["GET /periods/year/:y"] --> YR["gộp recap các quý → 'Năm vừa rồi thế nào?'"]
+    YR --> CY[("cache YearReview")]
+```
+
+## PHA F — Meta báo chí · Kiểm chứng · Tối ưu LLM
+
+```mermaid
+flowchart TD
+    subgraph Meta["Meta báo chí — 0 LLM (SQL/heuristic)"]
+      P2["/blindspots<br/>sourceCount = 1"]
+      P1["/sources<br/>ai đưa tin đầu · độc quyền"]
+      P3["/entities<br/>NER heuristic (freq ≥ 3)"]
+    end
+    subgraph FC["Kiểm chứng"]
+      Claim["/factcheck?claim="] --> Ret["retrieval k=12<br/>(cả 2 phía)"]
+      Ret --> Struct["generateStructured<br/>json_schema → verdict + confidence (B2)"]
+      Struct -.->|"model free không hỗ trợ"| Regex["fallback regex cũ"]
+      Web["/factcheck/online"] --> Plugin["generateWeb · plugin web (B4)<br/>nhãn nguồn ngoài"]
+    end
+    subgraph Opt["Tối ưu LLM (OpenRouter)"]
+      Tier["B1 tier: nano→20b · reasoning→120b<br/>tán tải 429"]
+      Usage["B3: mỗi call → UsageService → LlmUsage<br/>panel /dashboard"]
+    end
 ```
 
 ---
@@ -779,10 +881,17 @@ useChatStream.send()
 | `llm/llm.service` (generate) | (C) sinh single-shot cho các trụ AI + recap |
 | `llm/features.prompts` | (C,D,E) prompt tóm tắt/brief/compare/timeline/sự kiện/recap/năm |
 | `articles/articles.service` | (C1-C4) summary, brief, timeline, compare, insights, stats |
-| `events/events.service` | (D1-D3) gom cụm sự kiện + điểm nóng + đồng thuận/mâu thuẫn |
+| `events/events.service` | (D,F1) gom cụm + điểm nóng + đồng thuận + developing/blindspots |
 | `periods/periods.service` | (E1-E3) quản lý quý + recap quý + tổng kết năm |
+| `sources/sources.service` | (F2) hồ sơ nguồn: đưa tin đầu, độc quyền, độ phủ (SQL) |
+| `entities/entities.service` | (F3) NER heuristic + hồ sơ thực thể |
+| `factcheck/factcheck.service` | (F5) kiểm chứng structured (B2) + web (B4) |
+| `llm/llm.service` (tier/usage) | (F6) tiering B1 + structured B2 + web B4 + đo token B3 |
+| `usage/usage.service` | (B3) ghi `LlmUsage` + `GET /usage` (FinOps) |
 | `web/lib/useChatStream` | (B1,B6,B8) EventSource phía client |
-| `web/app/page.tsx` | (trang chủ) banner quý + carousel điểm nóng + số liệu |
+| `web/app/page.tsx` | (trang chủ) dashboard master–detail điểm nóng |
 | `web/app/events/[id]` | render sự kiện: phân tích đa nguồn + timeline |
 | `web/app/review` + `review/[id]` | Nhìn lại: danh sách quý + recap quý/năm |
-```
+| `web/app/factcheck` | kiểm chứng: verdict + confidence + nút web |
+| `web/app/sources` · `entities` · `blindspots` | meta báo chí (F1-F3) |
+| `web/app/dashboard` | thống kê + panel "Chi phí AI · token" (B3) |

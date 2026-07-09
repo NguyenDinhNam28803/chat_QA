@@ -130,7 +130,7 @@
 <div class="bar">
   <div>
     <h1>Điểm Tin AI — kiến trúc chi tiết</h1>
-    <div class="sub">37 thành phần · 7 luồng nghiệp vụ · 2 Ollama · 1 nguồn sự thật</div>
+    <div class="sub">38 thành phần · 8 luồng · 3 tier model · đo token · 1 nguồn sự thật</div>
   </div>
   <div class="spacer"></div>
   <div class="chips" id="chips">
@@ -142,6 +142,7 @@
     <button class="chip" data-flow="factcheck">Kiểm chứng</button>
     <button class="chip" data-flow="meta">Meta báo chí</button>
     <button class="chip" data-flow="pillars">Trụ AI</button>
+    <button class="chip" data-flow="usage">Chi phí AI</button>
   </div>
   <button id="themeToggle">Theme</button>
 </div>
@@ -229,6 +230,8 @@
   <path class="edge" id="e-fc-llm"       d="M1000,780 C 1014,776 1020,706 1030,698"/>
   <path class="edge" id="e-articles-llm" d="M1000,948 C 1022,930 1024,760 1030,712"/>
   <path class="edge" id="e-prompts-llm"  d="M1215,735 L1215,722"/>
+  <path class="edge dash" id="e-llm-usage"    d="M1400,700 C 1426,770 1426,888 1400,944"/>
+  <path class="edge" id="e-usage-prisma" d="M1080,982 C 1050,1016 1030,1046 1000,1050"/>
 
   <!-- ── edges: service → prisma → pg ──────── -->
   <path class="edge" id="e-chat-prisma"     d="M650,486 C 606,494 604,700 604,940 C 604,1012 632,1046 672,1050"/>
@@ -254,6 +257,7 @@
   <text class="elbl" data-e="e-llm-openrouter"     x="1472" y="798" text-anchor="end">fallback thủ công</text>
   <text class="elbl" data-e="e-fc-ret"             x="1004" y="700" text-anchor="end">k=12</text>
   <text class="elbl" data-e="e-meta-prisma"        x="644" y="968" text-anchor="end">0 LLM</text>
+  <text class="elbl" data-e="e-llm-usage"          x="1432" y="824">log token</text>
 
   <!-- ── nodes: client pages ───────────────── -->
   <g class="node" data-k="p-home">
@@ -400,8 +404,8 @@
   <g class="node" data-k="s-factcheck">
     <rect x="650" y="724" width="350" height="80"/>
     <text class="t" x="668" y="750">FactcheckService</text>
-    <text class="k" x="668" y="768">A1 · phân loại lập trường</text>
-    <text class="m" x="668" y="788">supported / conflicting / insufficient</text>
+    <text class="k" x="668" y="768">A1 · B2 structured · B4 web</text>
+    <text class="m" x="668" y="788">verdict + confidence · checkOnline() opt-in</text>
   </g>
   <g class="node pure" data-k="s-meta">
     <rect x="650" y="817" width="350" height="90"/>
@@ -434,25 +438,31 @@
     <text class="m" x="1048" y="584">đánh số [1..n] · gom citations theo bài</text>
     <text class="m" x="1048" y="598">minDistance + số nguồn → cao/TB/thấp</text>
   </g>
-  <g class="node" data-k="s-llm">
+  <g class="node gate" data-k="s-llm">
     <rect x="1030" y="620" width="370" height="100"/>
     <text class="t" x="1048" y="646">LlmService</text>
-    <text class="m" x="1048" y="666">streamAnswer() · generate() single-shot</text>
-    <text class="m" x="1048" y="682">thử từng model, AbortController 60s</text>
-    <text class="m" x="1048" y="698">chỉ đổi model khi CHƯA phát token nào</text>
-    <text class="m" x="1048" y="712">maxRetries: 0 → fail nhanh</text>
+    <text class="k" x="1048" y="664">B1 tier · B2 json · B3 token · B4 web</text>
+    <text class="m" x="1048" y="683">tier nano/standard/reasoning → chuỗi slug</text>
+    <text class="m" x="1048" y="699">stream · generate · generateStructured · Web</text>
+    <text class="m" x="1048" y="713">ghi token mỗi lần → UsageService · fallback thủ công</text>
   </g>
   <g class="node pure" data-k="s-prompts">
-    <rect x="1030" y="735" width="370" height="80"/>
+    <rect x="1030" y="735" width="370" height="76"/>
     <text class="t" x="1048" y="761">qa.prompt · features.prompts</text>
     <text class="m" x="1048" y="781">grounding nghiêm: chỉ dùng NGỮ CẢNH</text>
-    <text class="m" x="1048" y="797">rewrite · factCheck · eventAnalysis · recap</text>
+    <text class="m" x="1048" y="797">rewrite · factCheck(json) · eventAnalysis · recap</text>
   </g>
   <g class="node" data-k="s-embed">
-    <rect x="1030" y="830" width="370" height="80"/>
-    <text class="t" x="1048" y="856">EmbeddingService ×2</text>
-    <text class="m" x="1048" y="876">@Optional() baseUrlOverride → 2 instance</text>
-    <text class="m" x="1048" y="892">fail cứng nếu ≠ 1024 chiều</text>
+    <rect x="1030" y="824" width="370" height="70"/>
+    <text class="t" x="1048" y="849">EmbeddingService ×2</text>
+    <text class="m" x="1048" y="869">@Optional() baseUrlOverride → 2 instance</text>
+    <text class="m" x="1048" y="884">fail cứng nếu ≠ 1024 chiều</text>
+  </g>
+  <g class="node pure" data-k="s-usage">
+    <rect x="1030" y="910" width="370" height="72"/>
+    <text class="t" x="1048" y="935">UsageService</text>
+    <text class="k" x="1048" y="953">B3 · usage accounting</text>
+    <text class="m" x="1048" y="972">record(feature, model, token, cost) → LlmUsage</text>
   </g>
 
   <!-- ── prisma ────────────────────────────── -->
@@ -477,7 +487,7 @@
     <text class="m" x="1518" y="366">Article (topic, summary, questions, eventId)</text>
     <text class="m" x="1518" y="382">Chunk (embedding vector(1024), contentTsv)</text>
     <text class="m" x="1518" y="398">Event (sourceCount, hotness, summary)</text>
-    <text class="m" x="1518" y="414">Period · YearReview · DailyBrief</text>
+    <text class="m" x="1518" y="414">Period · YearReview · DailyBrief · LlmUsage</text>
     <text class="m" x="1518" y="430">Conversation · Message (citations, feedback)</text>
     <text class="m" x="1518" y="452">HNSW vector_cosine_ops + GIN tsvector</text>
     <text class="m" x="1518" y="470">dữ liệu không bao giờ xoá — chỉ archive</text>
@@ -506,7 +516,7 @@
   </g>
 </svg>
 
-  <div class="src">docs/BUSINESS-FLOW.md · CAI-TIEN.md · CAI-TIEN-V2.md</div>
+  <div class="src">docs/BUSINESS-FLOW.md · CAI-TIEN.md · OPENROUTER.md</div>
 
   <div class="card" id="flowcap">
     <div class="fname" id="f-name"></div>
@@ -515,7 +525,7 @@
 
   <div class="card" id="detail">
     <h3 id="d-title">Bấm vào bất kỳ khối nào</h3>
-    <div class="meta" id="d-meta">37 thành phần · chi tiết từng service</div>
+    <div class="meta" id="d-meta">38 thành phần · chi tiết từng service</div>
     <p id="d-body">Mỗi hộp là một class/route có thật trong repo. Chip phía trên làm mờ phần còn lại và <b>chạy animation đường đi</b> của từng luồng nghiệp vụ.</p>
   </div>
 </div>
@@ -529,7 +539,7 @@ const DETAIL = {
   "p-event":  { t:"/events/[id]", m:"chi tiết sự kiện", b:"Phân tích <b>đồng thuận / mâu thuẫn</b> giữa các báo (LLM, cache) + dòng thời gian đa nguồn có link bài gốc." },
   "p-review": { t:"/review · /review/[id]", m:"nhìn lại theo quý", b:"Các quý gom theo năm; mỗi quý có recap AI + điểm nóng + phân bố lĩnh vực. Nút “Năm vừa rồi thế nào?” gộp các quý thành tổng kết năm." },
   "p-articles": { t:"/articles · /articles/[id]", m:"thư viện + chi tiết bài", b:"Tìm full-text + lọc lĩnh vực. Trang bài có nút <b>Tóm tắt AI</b> (cache) và <b>Gợi ý câu hỏi</b> (E3) → mở <code>/chat?q=…</code>." },
-  "p-brief":  { t:"Bản tin · Timeline · Đối chiếu · Bảng tin", m:"4 trang trụ AI", b:"Bản tin ngày (cache), dòng thời gian sự việc + narrative, so sánh cách các báo đưa tin, và dashboard thống kê (thuần SQL)." },
+  "p-brief":  { t:"Bản tin · Timeline · Đối chiếu · Bảng tin", m:"4 trang trụ AI", b:"Bản tin ngày (cache), dòng thời gian sự việc + narrative, so sánh cách các báo đưa tin, và <b>/dashboard</b> — thống kê thuần SQL <b>+ panel “Chi phí AI · token” (B3)</b>." },
 
   sched:      { t:"IngestionScheduler", m:"onModuleInit · BullMQ", b:"Khi app boot: <code>queue.drain()</code> rồi đăng ký job <b>lặp mỗi 30 phút</b> cho từng feed, <code>jobId: feed:{id}</code> nên không nhân bản. Công tắc <code>INGEST_ON_BOOT</code> để tắt khi cần tài nguyên." },
   processor:  { t:"IngestionProcessor", m:"BullMQ WorkerHost", b:"Nhận job và gọi <code>ingestFeed()</code>. Chạy nền → request người dùng không bao giờ phải chờ nạp tin. Tự retry, <code>removeOnFail: 50</code>." },
@@ -548,13 +558,14 @@ const DETAIL = {
   "s-chat":     { t:"ChatService", m:"điều phối · E1 rewrite", b:"Nếu có <code>conversationId</code> → lấy 4 message gần nhất, LLM <b>viết lại câu hỏi thành truy vấn độc lập</b> (\"còn ông ấy thì sao?\" → tên cụ thể). <b>Best-effort</b>: lỗi/timeout/kết quả bất thường → dùng câu gốc, chat không bao giờ vỡ. Sau đó stream token và lưu <code>Message</code> + citations." },
   "s-events":   { t:"EventsService", m:"B1 · B2 · P2", b:"<b>cluster()</b>: lấy bài 4 ngày + vector đại diện (chunk <code>ord=0</code>), gom tham lam theo <b>cosine ≥ 0.72</b> — <b>0 LLM</b>. hotness = số báo×3 + số bài + độ mới. <b>getEvent()</b> gọi LLM một lần phân tích đồng thuận/mâu thuẫn rồi cache vào <code>Event.summary</code>. <b>listDeveloping()</b> so với mốc tin mới nhất (không dùng now()). <b>listBlindspots()</b> lọc <code>sourceCount = 1</code>." },
   "s-periods":  { t:"PeriodsService", m:"quý · recap · năm", b:"<code>getActive()</code> tự tạo quý hiện tại và <b>archive quý cũ</b> (chỉ lưu counts, không LLM). <code>computeStats()</code> tính <b>LIVE theo khoảng ngày</b> — dữ liệu quá khứ đã đóng băng nên không cần snapshot. Recap quý &amp; tổng kết năm sinh bằng LLM rồi cache." },
-  "s-factcheck":{ t:"FactcheckService", m:"A1 · stance", b:"Truy hồi <b>k=12</b> (lấy rộng để có cả bằng chứng phản bác), buộc LLM in dòng đầu <code>VERDICT: supported|conflicting|insufficient</code> rồi tự parse. Không có nguồn → trả <code>insufficient</code> trung thực, <b>không bịa</b>." },
+  "s-factcheck":{ t:"FactcheckService", m:"A1 · B2 structured · B4 web", b:"Truy hồi <b>k=12</b> (cả bằng chứng phản bác). <b>B2:</b> <code>generateStructured</code> buộc model trả JSON theo <code>json_schema</code> {verdict, confidence, analysis} — xoá regex mong manh, <b>miễn phí thêm confidence</b>; nếu model free không tôn trọng schema → <b>fallback</b> về regex cũ. <b>B4 checkOnline():</b> nút opt-in tra web (<code>plugins:[{id:'web'}]</code>), nhãn “nguồn ngoài, chưa kiểm duyệt”, tách khỏi luồng grounded." },
   "s-meta":     { t:"SourcesService + EntitiesService", m:"P1 · P3 — 0 LLM", b:"<b>P1:</b> <code>DISTINCT ON (event) ORDER BY publishedAt ASC</code> → bài sớm nhất mỗi cụm = báo <b>đưa tin đầu tiên</b>; cộng thêm tin độc quyền &amp; độ phủ lĩnh vực. <b>P3:</b> gom token viết hoa liền nhau trong tiêu đề, lọc stopword đầu câu, giữ cụm xuất hiện <b>≥ 3 lần</b>; hồ sơ = full-text tìm bài nhắc tên." },
   "s-articles": { t:"ArticlesService", m:"5 trụ AI · cache", b:"Tóm tắt bài → cache <code>Article.summary</code>. Bản tin ngày → cache <code>DailyBrief</code> theo ngày. Timeline/Compare: full-text rồi LLM viết narrative (<b>lỗi vẫn trả data</b>). suggestQuestions (E3) → cache <code>Article.questions</code>. Insights: <b>thuần SQL</b>." },
 
   "s-retrieval":{ t:"RetrievalService", m:"hybrid · RRF · recency", b:"Chạy song song <b>vector</b> (<code>embedding &lt;=&gt; $vec</code>) và <b>full-text</b> (<code>contentTsv @@ plainto_tsquery</code>), mỗi bên pool 20, hợp nhất bằng <b>Reciprocal Rank Fusion</b> (k=60). Cộng nhẹ điểm mới (hệ số 0.005, phân rã 7 ngày) — tin mới thắng khi độ liên quan tương đương, nhưng không lấn át relevance." },
   "s-context":  { t:"context.builder", m:"hàm thuần · unit-tested", b:"Đánh số đoạn <code>[1..n]</code> và gom citations <b>theo bài</b> (mỗi bài một nguồn dù nhiều chunk). <b>A3 scoreConfidence:</b> <code>minDistance</code> (cosine gần nhất) + số nguồn độc lập → cao / trung bình / thấp. Chính là <code>distance</code> mà trước đây bị vứt đi." },
-  "s-llm":      { t:"LlmService", m:"stream + fallback thủ công", b:"Thử từng model theo thứ tự, mỗi lần bọc <code>AbortController</code> timeout 60s; <b>chỉ chuyển model khi chưa phát token nào</b> (không thể restart giữa chừng). Bỏ <code>withFallbacks</code> vì nó <b>treo</b> khi primary 429. <code>generate()</code> là bản single-shot cho summary/brief/recap/factcheck." },
+  "s-llm":      { t:"LlmService", m:"B1 tier · B2 json · B3 token · B4 web", b:"<b>B1 tiering:</b> 3 tier <code>nano|standard|reasoning</code>, mỗi tier là một chuỗi slug (tier→primary→fallback); việc nhẹ (rewrite/suggest)→20b, việc khó (chat/factcheck/recap)→120b ⇒ rẻ hơn + <b>tán tải 429</b>. <b>B2:</b> <code>generateStructured</code> gọi thẳng OpenRouter với <code>response_format: json_schema</code>. <b>B4:</b> <code>generateWeb</code> plugin web. <b>B3:</b> bắt token qua <code>streamUsage</code> (stream) và <code>usage:{include:true}</code> (fetch) → ghi <code>UsageService</code>. Vẫn giữ fallback thủ công (bỏ <code>withFallbacks</code> vì treo khi 429)." },
+  "s-usage":    { t:"UsageService", m:"B3 · FinOps cho AI", b:"Mỗi lời gọi LLM thật ghi một dòng <code>LlmUsage</code> (feature, model, in/out tokens, cost) — <b>fire-and-forget</b>, không bao giờ chặn luồng LLM. <code>GET /usage</code> gộp 30 ngày theo feature &amp; model → panel “Chi phí AI · token” trên <code>/dashboard</code>. Không đo thì không tối ưu được: thấy ngay tính năng nào ngốn token nhất." },
   "s-prompts":  { t:"qa.prompt + features.prompts", m:"grounding nghiêm", b:"“CHỈ trả lời dựa trên NGỮ CẢNH… không tìm thấy thì nói không tìm thấy… luôn trích [số]… không bịa.” Các prompt khác: rewriteFollowup, factCheck (stance), eventAnalysis, periodRecap, yearReview, suggestQuestions." },
   "s-embed":    { t:"EmbeddingService ×2", m:"bge-m3 · 1024 chiều", b:"Một class, <b>hai instance</b> qua <code>@Optional() baseUrlOverride</code> + token DI <code>EMBEDDING_INGEST</code>. <b>Fail cứng</b> nếu vector ≠ 1024 chiều để không làm hỏng cột <code>vector(1024)</code>. Cạm bẫy: param string khiến Nest tưởng là dependency → phải <code>@Optional()</code>." },
 
@@ -564,7 +575,7 @@ const DETAIL = {
   pg:         { t:"Postgres 16 + pgvector", m:"nguồn sự thật duy nhất", b:"Một DB giữ tất cả. <b>HNSW</b> (vector_cosine_ops) cho vector, <b>GIN</b> cho tsvector. Bảng <code>Event</code>/<code>Period</code>/<code>YearReview</code> được áp bằng <b>raw SQL</b> vào DB đang chạy (không <code>prisma migrate</code>) để khỏi reset dev DB. Dữ liệu <b>không bao giờ bị xoá</b> — sang quý mới chỉ archive." },
   ollamaIngest:{ t:"Ollama · nạp tin (:11435)", m:"container riêng", b:"Ollama xử lý request <b>tuần tự</b>. Khi dùng chung một instance, ingestion embed hàng loạt đẩy độ trễ embed câu hỏi từ ~0.6s lên <b>16–28s</b> → <code>/chat/stream</code> timeout. Tách container thứ hai là cách rẻ nhất để chữa (đổi lại ~1.2GB RAM)." },
   ollamaChat: { t:"Ollama · chat (:11434)", m:"độ trễ thấp", b:"Chỉ embed câu hỏi lúc truy hồi → luôn rảnh, ~1s. <b>Bắt buộc cùng model bge-m3</b> với lúc nạp: khác model thì vector không so sánh được và cả DB phải embed lại." },
-  openrouter: { t:"OpenRouter", m:"ngoài hệ thống · free-tier", b:"Model <code>:free</code> hay 429 và bị đổi/gỡ liên tục (deepseek-chat-v3 đã bị gỡ). Vì vậy: fallback thủ công + timeout, và <b>cache mọi thứ LLM sinh ra</b> — tóm tắt bài, bản tin ngày, phân tích sự kiện, recap quý, gợi ý câu hỏi." },
+  openrouter: { t:"OpenRouter", m:"ngoài hệ thống · free-tier", b:"Model <code>gpt-oss-120b/20b:free</code> hay 429 và bị đổi/gỡ liên tục. Vì vậy: fallback thủ công + timeout + <b>cache mọi thứ LLM sinh ra</b>. Khai thác đặc thù OpenRouter: <b>đổi model chỉ là đổi slug</b> (B1 tiering), <code>response_format: json_schema</code> (B2), <code>usage:{include:true}</code> (B3), <code>plugins:[{id:'web'}]</code> (B4 — model <code>:free</code> chưa dùng được web nên degrade an toàn)." },
 };
 
 const FLOWS = {
@@ -643,6 +654,17 @@ const FLOWS = {
       "Bản tin ngày → cache theo ngày (<code>DailyBrief</code>)",
       "Timeline / Đối chiếu: full-text tìm bài rồi LLM viết narrative (<b>lỗi vẫn trả data</b>)",
       "Insights: <b>thuần SQL</b> — bài/ngày, top nguồn, từ khóa nổi (lọc stopword tiếng Việt)"
+    ]
+  },
+  usage: {
+    name: "Chi phí AI — định tuyến model & đo token (B1·B3)",
+    edges: ["e-schat-sllm","e-articles-llm","e-fc-llm","e-llm-usage","e-usage-prisma","e-prisma-pg","e-brief-ui","e-llm-openrouter"],
+    nodes: ["s-llm","s-usage","openrouter","prisma","pg","p-brief"],
+    steps: [
+      "<b>B1:</b> mỗi tính năng gắn <code>tier</code> — việc nhẹ→model 20b, việc khó→120b (tán tải 429)",
+      "Mỗi lời gọi LLM thật đo token (<code>streamUsage</code> / <code>usage:{include}</code>)",
+      "<code>UsageService.record()</code> ghi <code>LlmUsage</code> (feature·model·token·cost) — fire-and-forget",
+      "<code>GET /usage</code> gộp 30 ngày → panel “Chi phí AI · token” trên <code>/dashboard</code>"
     ]
   }
 };

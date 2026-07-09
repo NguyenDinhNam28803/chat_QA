@@ -216,7 +216,12 @@ export class ArticlesService {
     if (!a) return null;
     if (a.summary) return { summary: a.summary, cached: true };
     const { system, user } = summarizeArticlePrompt(a.title, a.content);
-    const summary = (await this.llm.generate(system, user)).trim();
+    const summary = (
+      await this.llm.generate(system, user, {
+        feature: 'summary',
+        tier: 'standard',
+      })
+    ).trim();
     await this.prisma.article.update({ where: { id }, data: { summary } });
     return { summary, cached: false };
   }
@@ -234,7 +239,10 @@ export class ArticlesService {
     let questions: string[] = [];
     try {
       const { system, user } = suggestQuestionsPrompt(a.title, a.content);
-      const raw = await this.llm.generate(system, user);
+      const raw = await this.llm.generate(system, user, {
+        feature: 'suggest',
+        tier: 'nano',
+      });
       questions = raw
         .split('\n')
         .map((l) => l.replace(/^\s*[-*\d.)]+\s*/, '').trim())
@@ -276,7 +284,12 @@ export class ArticlesService {
       )
       .join('\n');
     const { system, user } = dailyBriefPrompt(block);
-    const content = (await this.llm.generate(system, user)).trim();
+    const content = (
+      await this.llm.generate(system, user, {
+        feature: 'brief',
+        tier: 'standard',
+      })
+    ).trim();
     await this.prisma.dailyBrief.create({ data: { date, content } });
     return { date, content, cached: false };
   }
@@ -298,7 +311,12 @@ export class ArticlesService {
         .join('\n');
       try {
         const { system, user } = timelineNarrativePrompt(q, block);
-        narrative = (await this.llm.generate(system, user)).trim();
+        narrative = (
+          await this.llm.generate(system, user, {
+            feature: 'timeline',
+            tier: 'standard',
+          })
+        ).trim();
       } catch {
         /* narrative is optional */
       }
@@ -332,7 +350,12 @@ export class ArticlesService {
         .join('\n\n');
       try {
         const { system, user } = compareSourcesPrompt(q, block);
-        analysis = (await this.llm.generate(system, user)).trim();
+        analysis = (
+          await this.llm.generate(system, user, {
+            feature: 'compare',
+            tier: 'reasoning',
+          })
+        ).trim();
       } catch {
         /* analysis is optional */
       }

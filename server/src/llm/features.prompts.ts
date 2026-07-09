@@ -130,6 +130,56 @@ export function factCheckPrompt(
   };
 }
 
+export function factCheckWebPrompt(claim: string): {
+  system: string;
+  user: string;
+} {
+  return {
+    system: [
+      'Bạn là công cụ kiểm chứng thông tin tiếng Việt, ĐƯỢC PHÉP tra cứu web.',
+      'Kiểm chứng nhận định của người dùng dựa trên nguồn web đáng tin cậy.',
+      'Trả về markdown: dòng đầu ghi một trong: "KẾT LUẬN: Đúng", "KẾT LUẬN: Sai", "KẾT LUẬN: Chưa rõ".',
+      'Sau đó nêu bằng chứng ngắn gọn kèm nguồn. Trung thực, không suy diễn quá dữ liệu tìm được.',
+    ].join(' '),
+    user: `NHẬN ĐỊNH: ${claim}`,
+  };
+}
+
+export function factCheckStructuredPrompt(
+  claim: string,
+  context: string,
+): { system: string; user: string } {
+  return {
+    system: [
+      'Bạn là công cụ KIỂM CHỨNG thông tin tiếng Việt, làm việc CHỈ trên các đoạn nguồn được cung cấp.',
+      'Đối chiếu nhận định của người dùng với ngữ cảnh và trả về JSON đúng khuôn được yêu cầu.',
+      '- verdict: "supported" nếu nhiều nguồn xác nhận; "conflicting" nếu các nguồn mâu thuẫn; "insufficient" nếu ngữ cảnh không đủ dữ liệu.',
+      '- confidence: số 0..1 thể hiện mức chắc chắn của kết luận.',
+      '- analysis: markdown gồm **Ủng hộ** (trích [số]), **Phản bác / lưu ý** (trích [số]), **Kết luận** (1-2 câu).',
+      'TUYỆT ĐỐI không dùng kiến thức ngoài ngữ cảnh; thiếu dữ liệu thì trung thực chọn insufficient.',
+    ].join(' '),
+    user: `NHẬN ĐỊNH CẦN KIỂM CHỨNG: ${claim}\n\nNGỮ CẢNH (các đoạn từ nhiều nguồn):\n${context}`,
+  };
+}
+
+// JSON Schema for factCheckStructuredPrompt (OpenRouter response_format).
+export const factCheckSchema = {
+  name: 'factcheck',
+  schema: {
+    type: 'object',
+    properties: {
+      verdict: {
+        type: 'string',
+        enum: ['supported', 'conflicting', 'insufficient'],
+      },
+      confidence: { type: 'number' },
+      analysis: { type: 'string' },
+    },
+    required: ['verdict', 'confidence', 'analysis'],
+    additionalProperties: false,
+  } as Record<string, unknown>,
+};
+
 export function suggestQuestionsPrompt(
   title: string,
   content: string,

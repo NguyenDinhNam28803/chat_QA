@@ -89,6 +89,20 @@ model YearReview {
   createdAt DateTime @default(now())
 }
 
+// (B3) One row per real LLM call — token & cost accounting per feature/model.
+model LlmUsage {
+  id           String   @id @default(cuid())
+  feature      String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  cost         Float    @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([feature])
+  @@index([createdAt])
+}
+
 model Chunk {
   id         String   @id @default(cuid())
   articleId  String

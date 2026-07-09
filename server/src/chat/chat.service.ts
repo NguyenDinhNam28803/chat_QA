@@ -128,7 +128,12 @@ export class ChatService {
         )
         .join('\n');
       const { system, user } = rewriteFollowupPrompt(turns, question);
-      const rewritten = (await this.llm.generate(system, user)).trim();
+      const rewritten = (
+        await this.llm.generate(system, user, {
+          feature: 'rewrite',
+          tier: 'nano',
+        })
+      ).trim();
       // Guard against a runaway/empty rewrite.
       if (!rewritten || rewritten.length > 300) return question;
       return rewritten;

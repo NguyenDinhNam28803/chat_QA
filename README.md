@@ -4,6 +4,8 @@
 
 **Luồng cốt lõi:** RSS ingest → phân loại chủ đề → cắt đoạn + embed (bge-m3) → lưu **pgvector** → **hybrid retrieval** (vector + full-text + RRF + recency boost) → **LLM (OpenRouter)** sinh câu trả lời kèm `[số]` → **SSE** stream ra **Next.js UI**.
 
+> 📊 **Người mới / cần báo cáo tổng thể?** Đọc **[docs/BAO-CAO-DU-AN.md](docs/BAO-CAO-DU-AN.md)** — báo cáo + hướng dẫn onboard đầy đủ (kiến trúc, mô hình dữ liệu, cách dùng **Ollama & OpenRouter**, luồng nghiệp vụ + sơ đồ, bản đồ file). Sơ đồ tương tác: [docs/architecture.html](docs/architecture.html).
+
 ---
 
 ## 📑 Mục lục
@@ -57,6 +59,19 @@ NewsQA dùng kiến trúc **RAG (Retrieval-Augmented Generation)**:
 - 🏥 **Health check** — endpoint `/health` kiểm tra Postgres + 2 Ollama.
 - 🐳 **Docker deployment** — Dockerfile multi-stage cho cả backend + frontend, chạy bằng `docker compose --profile app`.
 - 🔄 **CI pipeline** — GitHub Actions: lint, test, build cho cả 2 project.
+
+### 🧠 Lớp "trí tuệ tin tức" (news intelligence)
+
+- 🔥 **Trí tuệ sự kiện** — gom bài **cùng sự kiện xuyên báo** (cosine ≥ 0.72, 0 LLM), độ nóng = số báo; trang chi tiết phân tích **đồng thuận / mâu thuẫn** (LLM, cache). Trang chủ = dashboard điểm nóng.
+- 🟢 **Câu chuyện đang phát triển** — cụm còn cập nhật + trải theo thời gian.
+- 🗄️ **Lưu trữ theo quý & Nhìn lại** — mỗi quý có recap AI + "Năm vừa rồi là một năm như thế nào?".
+- ✅ **Nhãn độ tin cậy** — mỗi câu trả lời kèm mức tin cậy (khoảng cách cosine + số nguồn).
+- 🔎 **Kiểm chứng nhận định** *(fact-check)* — verdict ủng hộ/mâu thuẫn/chưa đủ (**JSON Schema** + confidence) + nút **tra web** (opt-in).
+- 🧩 **Meta báo chí** — hồ sơ **nguồn** (ai đưa tin đầu, tin độc quyền), hồ sơ **thực thể** tự cập nhật, radar **điểm mù** (tin chỉ 1 nguồn). Thuần SQL/heuristic — không aggregator nào có.
+- 💬 **Hỏi nối tiếp đa lượt** — viết lại câu hỏi theo ngữ cảnh hội thoại.
+- 🎚️ **Định tuyến model theo tác vụ** + 📊 **đo token/chi phí** (panel trên `/dashboard`).
+
+> Sơ đồ kiến trúc tương tác (bấm node, chạy animation từng luồng): mở [`docs/architecture.html`](docs/architecture.html) bằng trình duyệt.
 
 ---
 

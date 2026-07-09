@@ -19,25 +19,64 @@ interface Insights {
   sources: { source: string; c: number }[];
   trending: { term: string; c: number }[];
 }
+interface Usage {
+  totalCalls: number;
+  totalInput: number;
+  totalOutput: number;
+  totalCost: number;
+  byFeature: {
+    feature: string;
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+    cost: number;
+  }[];
+  byModel: { model: string; calls: number; cost: number }[];
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  chat: 'Chat Q&A',
+  factcheck: 'Kiểm chứng',
+  'factcheck-web': 'Kiểm chứng web',
+  summary: 'Tóm tắt bài',
+  brief: 'Bản tin ngày',
+  timeline: 'Dòng thời gian',
+  compare: 'Đối chiếu',
+  event: 'Phân tích sự kiện',
+  recap: 'Tổng kết quý',
+  year: 'Tổng kết năm',
+  rewrite: 'Viết lại câu hỏi',
+  suggest: 'Gợi ý câu hỏi',
+};
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [ins, setIns] = useState<Insights | null>(null);
+  const [usage, setUsage] = useState<Usage | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [s, i] = await Promise.all([
+        const [s, i, u] = await Promise.all([
           fetch(`${API}/articles/stats`),
           fetch(`${API}/insights`),
+          fetch(`${API}/usage`),
         ]);
         if (s.ok) setStats(await s.json());
         if (i.ok) setIns(await i.json());
+        if (u.ok) setUsage(await u.json());
       } catch {
         /* ignore */
       }
     })();
   }, []);
+
+  const maxFeatTok = usage
+    ? Math.max(
+        ...usage.byFeature.map((f) => f.inputTokens + f.outputTokens),
+        1,
+      )
+    : 1;
 
   const topicTotal = stats ? stats.byTopic.reduce((s, t) => s + t.count, 0) : 0;
   const maxTopic = stats ? Math.max(...stats.byTopic.map((t) => t.count), 1) : 1;
@@ -185,6 +224,56 @@ export default function DashboardPage() {
                 </div>
               </Panel>
             </div>
+
+            {/* B3 — LLM usage / cost accounting */}
+            {usage && usage.totalCalls > 0 && (
+              <Panel
+                title="Chi phí AI · token theo tính năng · 30 ngày"
+                right={
+                  <span className="label">
+                    {usage.totalCalls} lượt · {(usage.totalInput + usage.totalOutput).toLocaleString('vi-VN')} token · ${usage.totalCost.toFixed(4)}
+                  </span>
+                }
+              >
+                <div className="grid gap-6 lg:grid-cols-3">
+                  <div className="space-y-2 lg:col-span-2">
+                    {usage.byFeature.map((f) => {
+                      const tok = f.inputTokens + f.outputTokens;
+                      return (
+                        <div key={f.feature}>
+                          <div className="mb-0.5 flex items-baseline justify-between text-sm">
+                            <span className="text-muted">
+                              {FEATURE_LABELS[f.feature] ?? f.feature}
+                              <span className="label ml-2">{f.calls} lượt</span>
+                            </span>
+                            <span className="font-mono text-xs tabular-nums text-muted">
+                              {tok.toLocaleString('vi-VN')} tok
+                            </span>
+                          </div>
+                          <div className="h-2 bg-white/5">
+                            <div className="h-full bg-accent" style={{ width: `${(tok / maxFeatTok) * 100}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div>
+                    <p className="label mb-2">Theo model</p>
+                    <div className="space-y-1.5">
+                      {usage.byModel.map((m) => (
+                        <div key={m.model} className="flex items-baseline justify-between gap-2 text-sm">
+                          <span className="truncate text-muted" title={m.model}>{m.model}</span>
+                          <span className="shrink-0 font-mono text-xs tabular-nums text-muted">{m.calls}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="label mt-4 text-muted">
+                      Free-tier nên chi phí ≈ $0; token vẫn đo được để biết tính năng nào “ngốn” nhất.
+                    </p>
+                  </div>
+                </div>
+              </Panel>
+            )}
 
             {/* Latest — full width */}
             <Panel title="Tin mới nhất" href="/articles" action="Xem tất cả">

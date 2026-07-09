@@ -15,6 +15,7 @@ import { PeriodsModule } from './periods/periods.module';
 import { FactcheckModule } from './factcheck/factcheck.module';
 import { SourcesModule } from './sources/sources.module';
 import { EntitiesModule } from './entities/entities.module';
+import { UsageModule } from './usage/usage.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { EntitiesModule } from './entities/entities.module';
     FactcheckModule,
     SourcesModule,
     EntitiesModule,
+    UsageModule,
   ],
   controllers: [AppController],
   providers: [AppService],
