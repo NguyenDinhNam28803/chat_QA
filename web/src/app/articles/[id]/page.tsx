@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Skeleton, Markdown } from '../../../components/ui';
+import { Skeleton, Markdown, ClickbaitBadge } from '../../../components/ui';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -14,6 +14,8 @@ interface Article {
   topic: string | null;
   publishedAt: string | null;
   content: string;
+  titleBodyScore: number | null;
+  clickbaitFlag: boolean;
 }
 
 interface RelatedRow {
@@ -154,6 +156,7 @@ export default function ArticleDetail() {
               <a href={article.url} target="_blank" rel="noopener noreferrer" className="underline decoration-white/30 underline-offset-2 hover:decoration-accent">
                 · Nguồn gốc ↗
               </a>
+              <ClickbaitBadge score={article.titleBodyScore} flag={article.clickbaitFlag} />
             </div>
             {/* AI summary */}
             <div className="mt-5">

@@ -6,6 +6,7 @@ const LINKS = [
   { href: '/chat', label: 'Chat' },
   { href: '/factcheck', label: 'Kiểm chứng' },
   { href: '/blindspots', label: 'Điểm mù' },
+  { href: '/clickbait', label: 'Radar giật tít' },
   { href: '/sources', label: 'Nguồn' },
   { href: '/entities', label: 'Thực thể' },
   { href: '/brief', label: 'Bản tin' },

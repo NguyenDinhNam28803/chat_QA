@@ -1,8 +1,10 @@
 # 📊 BÁO CÁO DỰ ÁN & HƯỚNG DẪN PHÁT TRIỂN — Điểm Tin AI
 
+> **Phiên bản hiện tại: V3** (2026-07-12) — bổ sung lớp **tính năng độc quyền**: **F2 máy dò giật tít** + **F5 dự báo chủ đề đang tăng nhiệt**. Chi tiết: [CAI-TIEN-V3.md](CAI-TIEN-V3.md).
+>
 > **Mục đích tài liệu:** một bản báo cáo tổng thể *đủ để trình bày* **và** *đủ để onboard*. Đọc xong tài liệu này, một thành viên mới có thể **nắm toàn bộ kiến trúc, dữ liệu, cách dùng AI (Ollama + OpenRouter) và tiếp tục phát triển** mà không cần mở từng file.
 >
-> **Tài liệu liên quan (đào sâu):** [BUSINESS-FLOW.md](BUSINESS-FLOW.md) (luồng + code từng bước) · [OPENROUTER.md](OPENROUTER.md) (tầng LLM) · [CAI-TIEN.md](CAI-TIEN.md) + [CAI-TIEN-V2.md](CAI-TIEN-V2.md) (nhật ký cải tiến) · [architecture.html](architecture.html) (sơ đồ tương tác — mở bằng trình duyệt).
+> **Tài liệu liên quan (đào sâu):** [BUSINESS-FLOW.md](BUSINESS-FLOW.md) (luồng + code từng bước) · [OPENROUTER.md](OPENROUTER.md) (tầng LLM) · [CAI-TIEN.md](CAI-TIEN.md) + [CAI-TIEN-V2.md](CAI-TIEN-V2.md) + [CAI-TIEN-V3.md](CAI-TIEN-V3.md) (nhật ký cải tiến) · [TINH-NANG-DOC-QUYEN.md](TINH-NANG-DOC-QUYEN.md) (đề xuất tính năng độc quyền F1–F8) · [architecture.html](architecture.html) (sơ đồ tương tác — mở bằng trình duyệt).
 
 ---
 
@@ -391,13 +393,13 @@ Endpoint: `/events` (điểm nóng) · `/events/developing` (đang phát triển
 | Nhóm | Endpoint | Ghi chú |
 |---|---|---|
 | Chat | `GET /chat/stream?q=&conversationId=&topic=` (SSE) · `GET /chat/conversations` · `.../messages` · `POST /chat/messages/:id/feedback` | RAG + lịch sử |
-| Bài | `GET /articles?q=&topic=&page=` · `/articles/:id` · `/:id/summary` · `/:id/questions` · `/:id/related` · `/articles/stats` · `/articles/topics` | thư viện + trụ AI |
+| Bài | `GET /articles?q=&topic=&page=` · `/articles/:id` · `/:id/summary` · `/:id/questions` · `/:id/related` · `/articles/stats` · `/articles/topics` · `/articles/clickbait` (**F2**) | thư viện + trụ AI + radar giật tít |
 | Trụ AI | `GET /brief` · `/timeline?q=` · `/compare?q=` · `/insights` | |
-| Sự kiện | `GET /events?from=` · `/events/developing` · `/events/blindspots` · `/events/:id` · `POST /events/cluster` | |
+| Sự kiện | `GET /events?from=` · `/events/developing` · `/events/rising` (**F5**) · `/events/blindspots` · `/events/:id` · `POST /events/cluster` | rising = đang tăng nhiệt |
 | Quý | `GET /periods/active` · `/periods` · `/periods/:id` · `/periods/year/:y` · `POST /periods/rollover` | |
 | Kiểm chứng | `GET /factcheck?claim=` · `/factcheck/online?claim=` | B2 · B4 |
 | Meta | `GET /sources` · `/sources/:name` · `/entities` · `/entities/:name` | P1 · P3 |
-| Vận hành | `GET /usage` · `/health` · `POST /ingestion/run` | B3 · giám sát |
+| Vận hành | `GET /usage` · `/health` · `POST /ingestion/run` · `POST /ingestion/backfill-clickbait` (**F2**) | B3 · giám sát · backfill điểm giật tít |
 
 ---
 
@@ -411,6 +413,7 @@ Endpoint: `/events` (điểm nóng) · `/events/developing` (đang phát triển
 | Chat | `/chat` | hỏi-đáp SSE + độ tin cậy + lịch sử |
 | Kiểm chứng | `/factcheck` | verdict + confidence + nút web |
 | Điểm mù | `/blindspots` | tin chỉ 1 nguồn |
+| Radar giật tít | `/clickbait` | xếp hạng bài nghi giật tít (**F2**) — điểm khớp tít–bài |
 | Nguồn | `/sources`, `/sources/[name]` | hồ sơ báo |
 | Thực thể | `/entities`, `/entities/[name]` | hồ sơ nhân vật/tổ chức |
 | Bản tin / Dòng thời gian / Đối chiếu | `/brief` `/timeline` `/compare` | trụ AI |
@@ -471,9 +474,10 @@ INGEST_ON_BOOT=true
 
 ## 13. Hướng phát triển tiếp
 
-**Đã xong:** RAG · 5 trụ AI · trí tuệ sự kiện · lưu trữ quý · confidence · fact-check (structured+web) · meta báo chí (P1/P2/P3) · OpenRouter B1/B2/B3/B4.
+**Đã xong:** RAG · 5 trụ AI · trí tuệ sự kiện · lưu trữ quý · confidence · fact-check (structured+web) · meta báo chí (P1/P2/P3) · OpenRouter B1/B2/B3/B4 · **V3: F2 máy dò giật tít + F5 dự báo tăng nhiệt** (xem [CAI-TIEN-V3.md](CAI-TIEN-V3.md)).
 
-**Còn lại (xem [OPENROUTER.md](OPENROUTER.md) + [DE-XUAT-TINH-NANG.md](DE-XUAT-TINH-NANG.md)):**
+**Còn lại (xem [TINH-NANG-DOC-QUYEN.md](TINH-NANG-DOC-QUYEN.md) + [OPENROUTER.md](OPENROUTER.md) + [DE-XUAT-TINH-NANG.md](DE-XUAT-TINH-NANG.md)):**
+- **Lớp độc quyền còn lại (không cần auth):** **F4** bảng phong độ nguồn (tổng hợp SQL) · **F1** radar bài bị sửa/gỡ ngầm (tính năng "chữ ký", dùng `contentHash` re-crawl) · **F3** thước đo khung tường thuật · F6/F7/F8 (tầm nhìn).
 - **Cận (không cần auth):** B7 stream các `generate()` (giảm TTFT) · B5 server-side fallback · A2 phát hiện "báo nào đăng lại của ai" · cron tự `POST /events/cluster` + `/periods/rollover`.
 - **Cần hệ thống định danh (auth) — mở khóa nhóm giá trị cao:** C1 theo dõi chủ đề + cảnh báo · C2 digest cá nhân hoá · **D1 media monitoring (B2B)** — con đường thương mại hoá.
 - **Tầm nhìn xa:** B8 multi-model consensus · B9 agentic RAG (tool-calling) · P3 nâng NER bằng LLM.
@@ -496,7 +500,9 @@ INGEST_ON_BOOT=true
 | **Mọi thứ về LLM** (tier/fallback/JSON/web/usage) | `server/src/llm/llm.service.ts` |
 | Prompt (grounding, fact-check, recap…) | `server/src/llm/{qa.prompt,features.prompts}.ts` |
 | Điều phối chat + rewrite (E1) | `server/src/chat/chat.service.ts` |
-| Gom cụm / điểm nóng / điểm mù | `server/src/events/events.service.ts` |
+| Gom cụm / điểm nóng / điểm mù / **tăng nhiệt (F5)** | `server/src/events/events.service.ts` |
+| **Vận tốc tăng nhiệt (F5)** — hàm thuần | `server/src/events/rising.util.ts` |
+| **Điểm giật tít (F2)** — cosine/centroid thuần | `server/src/embedding/vector.util.ts` |
 | Lưu trữ quý / recap / năm | `server/src/periods/periods.service.ts` |
 | Fact-check (B2 + B4) | `server/src/factcheck/factcheck.service.ts` |
 | Hồ sơ nguồn / thực thể (meta) | `server/src/{sources,entities}/*.service.ts` |

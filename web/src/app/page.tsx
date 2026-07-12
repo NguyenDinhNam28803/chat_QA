@@ -29,6 +29,13 @@ interface EventItem {
   times: string[];
   developing?: boolean;
 }
+interface RisingItem extends EventItem {
+  recentArticles: number;
+  priorArticles: number;
+  recentSources: number;
+  velocity: number;
+  windowHours: number;
+}
 interface ArticleRow {
   id: string;
   title: string;
@@ -200,6 +207,7 @@ export default function Home() {
   const [trending, setTrending] = useState<{ term: string; c: number }[]>([]);
   const [period, setPeriod] = useState<PeriodActive | null>(null);
   const [developing, setDeveloping] = useState<EventItem[]>([]);
+  const [rising, setRising] = useState<RisingItem[]>([]);
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -212,15 +220,17 @@ export default function Home() {
         setPeriod(p);
         const fromQ =
           p?.startDate ? `?from=${encodeURIComponent(p.startDate)}` : '';
-        const [e, a, s, i, dev] = await Promise.all([
+        const [e, a, s, i, dev, ris] = await Promise.all([
           fetch(`${API}/events${fromQ}`),
           fetch(`${API}/articles`),
           fetch(`${API}/articles/stats`),
           fetch(`${API}/insights`),
           fetch(`${API}/events/developing`),
+          fetch(`${API}/events/rising`),
         ]);
         if (e.ok) setEvents(await e.json());
         if (dev.ok) setDeveloping(await dev.json());
+        if (ris.ok) setRising(await ris.json());
         if (a.ok) {
           const r = (await a.json()) as { items: ArticleRow[] };
           setLatest(r.items.slice(0, 12));
@@ -469,6 +479,39 @@ export default function Home() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ===== F5 — rising stories (coverage accelerating) ===== */}
+        {rising.length > 0 && (
+          <section>
+            <SectionHead
+              label="▲ Đang tăng nhiệt"
+              title="Sự kiện nhiều báo đang dồn vào"
+            />
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {rising.map((e) => (
+                <Link
+                  key={e.id}
+                  href={`/events/${e.id}`}
+                  className="group flex w-64 shrink-0 flex-col rounded-lg border border-amber-400/30 bg-surface p-4 transition hover:border-amber-400"
+                  title={`${e.recentArticles} bài trong ${e.windowHours}h gần nhất, so với ${e.priorArticles} bài trước đó`}
+                >
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="label inline-flex items-center gap-1 text-amber-400">
+                      ▲ +{e.velocity} bài/{e.windowHours}h
+                    </span>
+                    <span className="label ml-auto">{rel(e.lastSeen)}</span>
+                  </div>
+                  <h3 className="flex-1 font-display font-bold leading-snug transition group-hover:text-amber-400">
+                    {e.title}
+                  </h3>
+                  <p className="label mt-3">
+                    {e.recentSources} báo mới vào · {e.sourceCount} báo tổng →
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* ===== B2 — developing stories (still unfolding) ===== */}

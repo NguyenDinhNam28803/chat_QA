@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Skeleton, highlight } from '../../components/ui';
+import { Skeleton, highlight, ClickbaitBadge } from '../../components/ui';
 import { Nav } from '../../components/Nav';
 
 const API = process.env.NEXT_PUBLIC_API_URL;
@@ -14,6 +14,8 @@ interface ArticleRow {
   publishedAt: string | null;
   url: string;
   snippet: string;
+  titleBodyScore: number | null;
+  clickbaitFlag: boolean;
 }
 interface TopicInfo {
   topic: string;
@@ -166,6 +168,9 @@ export default function ArticlesPage() {
                 {a.publishedAt && (
                   <span className="text-xs text-muted">· {new Date(a.publishedAt).toLocaleDateString('vi-VN')}</span>
                 )}
+                <span className="ml-auto">
+                  <ClickbaitBadge score={a.titleBodyScore} flag={a.clickbaitFlag} compact />
+                </span>
               </div>
               <Link href={`/articles/${a.id}`} className="block font-display text-lg font-bold leading-snug transition group-hover:text-accent">
                 {highlight(a.title, query)}

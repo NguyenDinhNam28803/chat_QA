@@ -70,6 +70,8 @@ NewsQA dùng kiến trúc **RAG (Retrieval-Augmented Generation)**:
 - 🧩 **Meta báo chí** — hồ sơ **nguồn** (ai đưa tin đầu, tin độc quyền), hồ sơ **thực thể** tự cập nhật, radar **điểm mù** (tin chỉ 1 nguồn). Thuần SQL/heuristic — không aggregator nào có.
 - 💬 **Hỏi nối tiếp đa lượt** — viết lại câu hỏi theo ngữ cảnh hội thoại.
 - 🎚️ **Định tuyến model theo tác vụ** + 📊 **đo token/chi phí** (panel trên `/dashboard`).
+- 🪝 **Radar giật tít** *(F2 · V3)* — chấm điểm **khớp tít–bài** (cosine tiêu đề ↔ centroid thân bài), gắn cờ nghi giật tít theo phân vị; trang `/clickbait`. 0 LLM.
+- ▲ **Đang tăng nhiệt** *(F5 · V3)* — dự báo sự kiện **nhiều báo đang dồn vào** bằng vận tốc đưa tin (cửa sổ gần vs trước); dải trên trang chủ. 0 LLM.
 
 > Sơ đồ kiến trúc tương tác (bấm node, chạy animation từng luồng): mở [`docs/architecture.html`](docs/architecture.html) bằng trình duyệt.
 
@@ -396,14 +398,23 @@ File `web/.env.local`: `NEXT_PUBLIC_API_URL=http://localhost:3000`.
 ### Articles (Thư viện bài viết)
 | Method | Path | Mô tả |
 |---|---|---|
-| `GET` | `/articles?q=&topic=&page=` | Tìm kiếm + lọc + phân trang |
+| `GET` | `/articles?q=&topic=&page=` | Tìm kiếm + lọc + phân trang (kèm điểm giật tít) |
 | `GET` | `/articles/topics` | Danh sách chủ đề + số bài |
-| `GET` | `/articles/:id` | Chi tiết bài viết |
+| `GET` | `/articles/:id` | Chi tiết bài viết (kèm điểm khớp tít–bài) |
+| `GET` | `/articles/clickbait?page=` | **F2** — xếp hạng bài nghi giật tít |
+
+### Events (trí tuệ sự kiện)
+| Method | Path | Mô tả |
+|---|---|---|
+| `GET` | `/events/developing` | Câu chuyện đang phát triển |
+| `GET` | `/events/rising?window=` | **F5** — sự kiện đang tăng nhiệt (vận tốc đưa tin) |
+| `POST` | `/events/cluster` | Gom cụm sự kiện (nền, 0 LLM) |
 
 ### Ingestion
 | Method | Path | Mô tả |
 |---|---|---|
 | `POST` | `/ingestion/run` | Trigger nạp tin thủ công |
+| `POST` | `/ingestion/backfill-clickbait` | **F2** — chấm điểm giật tít cho bài cũ (idempotent) |
 
 ### Monitoring
 | Method | Path | Mô tả |
@@ -528,16 +539,18 @@ GitHub Actions workflow tại [`.github/workflows/ci.yml`](.github/workflows/ci.
 
 | File | Nội dung |
 |---|---|
+| [docs/BAO-CAO-DU-AN.md](docs/BAO-CAO-DU-AN.md) | **Báo cáo tổng thể + onboard** (kiến trúc, dữ liệu, AI, luồng, bản đồ file) |
 | [docs/ONBOARDING.md](docs/ONBOARDING.md) | Chạy & hiểu dự án trong ~15 phút |
 | [docs/BUSINESS-FLOW.md](docs/BUSINESS-FLOW.md) | Luồng nghiệp vụ chi tiết + code + sơ đồ Mermaid + payload thật |
-| [docs/CAI-TIEN.md](docs/CAI-TIEN.md) | Nhật ký cải tiến (vấn đề → giải pháp → bằng chứng) |
+| [docs/CAI-TIEN.md](docs/CAI-TIEN.md) · [V2](docs/CAI-TIEN-V2.md) · [V3](docs/CAI-TIEN-V3.md) | Nhật ký cải tiến (vấn đề → giải pháp → bằng chứng) |
+| [docs/TINH-NANG-DOC-QUYEN.md](docs/TINH-NANG-DOC-QUYEN.md) | Đề xuất **tính năng độc quyền** F1–F8 (F2/F5 đã làm ở V3) |
 | [docs/plans/](docs/plans/) | Kế hoạch triển khai gốc (Phase 1→7) |
 
 ---
 
 ## 📊 Trạng thái
 
-**11 phase hoàn tất** — từ Phase 1 (infra) đến Phase 11 (tính năng sản phẩm) + nhiều cải tiến ngoài kế hoạch.
+**Phiên bản hiện tại: V3** — 11 phase gốc + Giai đoạn 2 (V2) + Giai đoạn 3 (V3: lớp tính năng độc quyền F2/F5).
 
 ### Tổng kết tính năng đã triển khai
 
@@ -550,5 +563,7 @@ GitHub Actions workflow tại [`.github/workflows/ci.yml`](.github/workflows/ci.
 | 10 | Health check + Integration tests + CI + Docker | ✅ |
 | 11 | Topic classifier + lọc lĩnh vực + thư viện bài viết | ✅ |
 | CT | 2 Ollama, sửa crash undici, UI mới, fallback model, lịch sử chat | ✅ |
+| V2 | Confidence · fact-check RAG · gợi ý câu hỏi · hỏi nối tiếp · đang phát triển | ✅ |
+| **V3** | **F2 máy dò giật tít · F5 dự báo tăng nhiệt** (độc quyền, 0 LLM) | ✅ |
 
-RAG loop chạy thật end-to-end: vừa nạp tin nền vừa chat mượt, kèm trích dẫn nguồn, lọc theo chủ đề, duyệt thư viện bài viết.
+RAG loop chạy thật end-to-end: vừa nạp tin nền vừa chat mượt, kèm trích dẫn nguồn, lọc theo chủ đề, duyệt thư viện bài viết. **V3** bổ sung lớp "đài quan sát báo chí" — đo giật tít và bắt sự kiện đang tăng nhiệt.

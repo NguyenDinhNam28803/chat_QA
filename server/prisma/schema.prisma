@@ -27,12 +27,16 @@ model Article {
   eventId     String?
   createdAt   DateTime  @default(now())
 
+  // F2 clickbait: cosine(title, body-centroid) in [0,1]. Null until backfilled.
+  titleBodyScore Float?
+
   chunks Chunk[]
   event  Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
 
   @@index([publishedAt])
   @@index([topic])
   @@index([eventId])
+  @@index([titleBodyScore])
 }
 
 model Event {

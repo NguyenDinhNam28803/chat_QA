@@ -19,6 +19,13 @@ export class EventsController {
     return this.events.listDeveloping();
   }
 
+  // F5 — stories heating up (coverage accelerating). Static route before ':id'.
+  @Get('rising')
+  rising(@Query('window') window?: string) {
+    const h = window ? Number(window) : undefined;
+    return this.events.listRising(8, h && h > 0 ? h : undefined);
+  }
+
   @Get('blindspots')
   blindspots() {
     return this.events.listBlindspots();

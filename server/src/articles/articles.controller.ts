@@ -16,6 +16,12 @@ export class ArticlesController {
     return this.articles.stats();
   }
 
+  // F2 clickbait ranking — static route, must precede ':id'.
+  @Get('clickbait')
+  clickbait(@Query('page') page?: string) {
+    return this.articles.clickbaitRanking(page ? Number(page) : 1);
+  }
+
   @Get(':id/related')
   related(@Param('id') id: string) {
     return this.articles.related(id);

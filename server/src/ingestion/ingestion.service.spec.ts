@@ -66,4 +66,51 @@ describe('IngestionService.ingestArticle — dedup', () => {
     expect(result).toBe('skipped');
     expect(d.embedding.embedBatch).not.toHaveBeenCalled();
   });
+
+  it('embeds the title first and stores a titleBodyScore on insert (F2)', async () => {
+    const d = makeDeps() as ReturnType<typeof makeDeps> & {
+      prisma: {
+        article: { findUnique: jest.Mock };
+        $transaction: jest.Mock;
+      };
+    };
+    d.prisma.article.findUnique
+      .mockResolvedValueOnce(null) // url miss
+      .mockResolvedValueOnce(null); // hash miss
+    d.extractor.extract.mockResolvedValue('nội dung');
+    d.chunker.chunk.mockReturnValue([
+      { ord: 0, content: 'đoạn một', tokenCount: 3 },
+      { ord: 1, content: 'đoạn hai', tokenCount: 3 },
+    ]);
+    // title vector aligns perfectly with the body centroid -> score ~1
+    d.embedding.embedBatch.mockResolvedValue([
+      [1, 0], // title
+      [1, 0], // chunk 0
+      [1, 0], // chunk 1
+    ]);
+    const create = jest.fn().mockResolvedValue({ id: 'new-id' });
+    d.prisma.$transaction = jest.fn(
+      async (cb: (tx: unknown) => Promise<void>) =>
+        cb({ article: { create }, $executeRaw: jest.fn() }),
+    );
+    const svc = new IngestionService(
+      d.prisma as never,
+      d.embedding as never,
+      d.chunker as never,
+      d.extractor as never,
+      d.rss as never,
+    );
+
+    const result = await svc.ingestArticle(item);
+
+    expect(result).toBe('inserted');
+    // title is the FIRST input to the single embed call
+    expect(d.embedding.embedBatch).toHaveBeenCalledWith([
+      'Tiêu đề',
+      'đoạn một',
+      'đoạn hai',
+    ]);
+    const data = create.mock.calls[0][0].data;
+    expect(data.titleBodyScore).toBeCloseTo(1);
+  });
 });

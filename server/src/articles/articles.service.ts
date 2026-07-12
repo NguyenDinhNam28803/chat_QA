@@ -27,6 +27,33 @@ export class ArticlesService {
     private readonly llm: LlmService,
   ) {}
 
+  // F2: articles whose title↔body score sits at/below this percentile of the
+  // corpus are flagged as possible clickbait. Relative (self-calibrating), not
+  // an absolute accusation. Configurable via env.
+  private readonly clickbaitPercentile = Math.min(
+    1,
+    Math.max(0, Number(process.env.CLICKBAIT_PERCENTILE ?? '0.15')),
+  );
+
+  /**
+   * The titleBodyScore value at the configured low percentile. Articles at or
+   * below it are flagged. Returns null when the corpus has no scored articles.
+   */
+  async clickbaitThreshold(): Promise<number | null> {
+    const rows = await this.prisma.$queryRaw<{ t: number | null }[]>(
+      Prisma.sql`
+        SELECT percentile_cont(${this.clickbaitPercentile})
+                 WITHIN GROUP (ORDER BY "titleBodyScore") AS t
+        FROM "Article" WHERE "titleBodyScore" IS NOT NULL`,
+    );
+    return rows[0]?.t ?? null;
+  }
+
+  /** True when a score is at/below the flag threshold (threshold null -> false). */
+  private isClickbait(score: number | null, threshold: number | null): boolean {
+    return score !== null && threshold !== null && score <= threshold;
+  }
+
   /** Topics with article counts, for filter chips. */
   async listTopics(): Promise<
     { topic: string; label: string; count: number }[]
@@ -61,6 +88,8 @@ export class ArticlesService {
       publishedAt: Date | null;
       url: string;
       snippet: string;
+      titleBodyScore: number | null;
+      clickbaitFlag: boolean;
     }[];
     total: number;
     page: number;
@@ -76,7 +105,7 @@ export class ArticlesService {
       : Prisma.empty;
     const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
 
-    const items = await this.prisma.$queryRaw<
+    const rows = await this.prisma.$queryRaw<
       {
         id: string;
         title: string;
@@ -85,10 +114,11 @@ export class ArticlesService {
         publishedAt: Date | null;
         url: string;
         snippet: string;
+        titleBodyScore: number | null;
       }[]
     >(Prisma.sql`
       SELECT "id", "title", "source", "topic", "publishedAt", "url",
-             left("content", 240) AS "snippet"
+             left("content", 240) AS "snippet", "titleBodyScore"
       FROM "Article"
       ${where}
       ORDER BY "publishedAt" DESC NULLS LAST
@@ -101,6 +131,12 @@ export class ArticlesService {
       SELECT count(*)::int AS count FROM "Article" ${where}
     `);
 
+    const threshold = await this.clickbaitThreshold();
+    const items = rows.map((r) => ({
+      ...r,
+      clickbaitFlag: this.isClickbait(r.titleBodyScore, threshold),
+    }));
+
     return {
       items,
       total: Number(totalRows[0]?.count ?? 0),
@@ -109,9 +145,9 @@ export class ArticlesService {
     };
   }
 
-  /** Full article by id. */
-  getById(id: string) {
-    return this.prisma.article.findUnique({
+  /** Full article by id, with the F2 title↔body score + clickbait flag. */
+  async getById(id: string) {
+    const article = await this.prisma.article.findUnique({
       where: { id },
       select: {
         id: true,
@@ -121,8 +157,70 @@ export class ArticlesService {
         topic: true,
         publishedAt: true,
         content: true,
+        titleBodyScore: true,
       },
     });
+    if (!article) return null;
+    const threshold = await this.clickbaitThreshold();
+    return {
+      ...article,
+      clickbaitFlag: this.isClickbait(article.titleBodyScore, threshold),
+    };
+  }
+
+  /**
+   * F2 ranking: articles most likely to be clickbait (lowest title↔body score
+   * first), skipping ones not yet scored. Returns the current flag threshold and
+   * percentile so the UI can explain the cut-off transparently.
+   */
+  async clickbaitRanking(page = 1): Promise<{
+    items: {
+      id: string;
+      title: string;
+      source: string;
+      topic: string | null;
+      publishedAt: Date | null;
+      url: string;
+      titleBodyScore: number | null;
+      clickbaitFlag: boolean;
+    }[];
+    threshold: number | null;
+    percentile: number;
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const p = Math.max(1, page);
+    const [rows, total, threshold] = await Promise.all([
+      this.prisma.article.findMany({
+        where: { titleBodyScore: { not: null } },
+        orderBy: { titleBodyScore: 'asc' },
+        take: PAGE_SIZE,
+        skip: (p - 1) * PAGE_SIZE,
+        select: {
+          id: true,
+          title: true,
+          source: true,
+          topic: true,
+          publishedAt: true,
+          url: true,
+          titleBodyScore: true,
+        },
+      }),
+      this.prisma.article.count({ where: { titleBodyScore: { not: null } } }),
+      this.clickbaitThreshold(),
+    ]);
+    return {
+      items: rows.map((r) => ({
+        ...r,
+        clickbaitFlag: this.isClickbait(r.titleBodyScore, threshold),
+      })),
+      threshold,
+      percentile: this.clickbaitPercentile,
+      total,
+      page: p,
+      pageSize: PAGE_SIZE,
+    };
   }
 
   /** Dashboard stats: totals, per-topic counts, latest articles. */

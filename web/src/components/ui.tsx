@@ -49,3 +49,34 @@ const mdComponents: Components = {
 export function Markdown({ children }: { children: string }) {
   return <ReactMarkdown components={mdComponents}>{children}</ReactMarkdown>;
 }
+
+/**
+ * F2 title↔body match badge. Score is cosine(title, body) in [0,1], shown 0–100.
+ * `flag` (percentile-based, from the API) marks the low-scoring tail as possible
+ * clickbait. Renders nothing until the article has been scored.
+ */
+export function ClickbaitBadge({
+  score,
+  flag,
+  compact = false,
+}: {
+  score: number | null | undefined;
+  flag: boolean;
+  compact?: boolean;
+}) {
+  if (score === null || score === undefined) return null;
+  const pct = Math.round(score * 100);
+  const cls = flag
+    ? 'border-amber-400/50 text-amber-400'
+    : 'border-white/15 text-muted';
+  return (
+    <span
+      className={`label inline-flex items-center gap-1 border px-1.5 py-0.5 ${cls}`}
+      title="Độ khớp giữa tiêu đề và nội dung (0–100). Thấp = tiêu đề ít phản ánh nội dung bài."
+    >
+      {flag ? '⚠️ ' : ''}
+      {compact ? pct : `Khớp tít–bài ${pct}`}
+      {flag && !compact ? ' · nghi giật tít' : ''}
+    </span>
+  );
+}

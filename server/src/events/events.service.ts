@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LlmService } from '../llm/llm.service';
 import { eventAnalysisPrompt } from '../llm/features.prompts';
+import { risingMetrics } from './rising.util';
 
 // Cosine similarity threshold for grouping two articles into the same event.
 const SIM_THRESHOLD = 0.72;
@@ -228,6 +229,75 @@ export class EventsService {
           (a.lastSeen ? a.lastSeen.getTime() : 0),
       )
       .slice(0, limit);
+  }
+
+  /**
+   * (F5) Events heating up: coverage accelerating in the most recent window vs
+   * the window before it. Velocity is computed live from article publish times
+   * (no stored time-series — events are rebuilt each cluster run, so ids aren't
+   * stable). Returns only accelerating, multi-source stories, hottest first.
+   */
+  async listRising(limit = 8, windowHours = 12) {
+    const windowMs = Math.max(1, windowHours) * 3_600_000;
+    const events = await this.prisma.event.findMany({
+      where: { sourceCount: { gte: 2 } },
+      orderBy: { lastSeen: 'desc' },
+      take: 120,
+      select: {
+        id: true,
+        title: true,
+        topic: true,
+        articleCount: true,
+        sourceCount: true,
+        firstSeen: true,
+        lastSeen: true,
+        articles: {
+          select: { source: true, publishedAt: true },
+          orderBy: { publishedAt: 'asc' },
+        },
+      },
+    });
+    // Reference = freshest activity across the batch (robust to a stale corpus).
+    const ref = events.reduce(
+      (mx, e) => Math.max(mx, e.lastSeen ? e.lastSeen.getTime() : 0),
+      0,
+    );
+    if (ref === 0) return [];
+
+    const scored = events
+      .map(({ articles, ...e }) => {
+        const withTime = articles.filter((a) => a.publishedAt);
+        const times = withTime.map((a) =>
+          new Date(a.publishedAt as Date).getTime(),
+        );
+        const m = risingMetrics(times, ref, windowMs);
+        // Distinct sources contributing in the recent window (breadth of pickup).
+        const recentSources = new Set(
+          withTime
+            .filter((a) => {
+              const age = ref - new Date(a.publishedAt as Date).getTime();
+              return age >= 0 && age < windowMs;
+            })
+            .map((a) => a.source),
+        ).size;
+        return {
+          ...e,
+          sources: Array.from(new Set(articles.map((a) => a.source))),
+          times: times.map((t) => new Date(t).toISOString()),
+          recentArticles: m.recent,
+          priorArticles: m.prior,
+          recentSources,
+          velocity: m.velocity,
+          windowHours,
+        };
+      })
+      // Accelerating (more now than before) with a real recent burst.
+      .filter((e) => e.velocity > 0 && e.recentArticles >= 2)
+      .sort(
+        (a, b) => b.velocity - a.velocity || b.recentSources - a.recentSources,
+      );
+
+    return scored.slice(0, limit);
   }
 
   /** Event detail: articles across sources + cached consensus/conflict analysis. */
