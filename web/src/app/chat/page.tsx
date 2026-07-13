@@ -180,12 +180,12 @@ export default function Home() {
           <button onClick={() => setSidebarOpen(true)} className="border border-white/15 px-2 py-1 text-xs md:hidden" aria-label="Mở lịch sử">
             ☰
           </button>
-          <div className="flex-1">
+          {/* <div className="flex-1">
             <h1 className="font-display text-[15px] font-bold leading-tight tracking-tight">
               Hỏi-đáp tin tức tiếng Việt
             </h1>
             <p className="label mt-0.5">Trả lời dựa trên tin đã nạp · kèm nguồn</p>
-          </div>
+          </div> */}
           <Nav current="/chat" />
         </header>
 
