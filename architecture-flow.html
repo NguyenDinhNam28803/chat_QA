@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diem Tin AI — Kiến Trúc Hệ Thống</title>
+<script>
+(function(){const s=localStorage.getItem('theme'),d=s?s==='dark':matchMedia('(prefers-color-scheme:dark)').matches;document.documentElement.classList.toggle('dark',d)})();
+</script>
+<style>
+:root{--bg:#FAF9F5;--surface:#FFF;--surface2:#F0EEE6;--ink:#141413;--body:#3D3D3A;--muted:#87867F;--line:#D1CFC5;--line-soft:#E6E3DA;--clay:#D97757;--clay-soft:rgba(217,119,87,.10);--olive:#788C5D;--olive-soft:rgba(120,140,93,.12);--gold:#C9A45C;--gold-soft:rgba(201,164,92,.10);--blue:#3d798b;--blue-soft:rgba(91,126,150,.10);--purple:#8B6BAE;--purple-soft:rgba(139,107,174,.12);--red:#C0504D;--red-soft:rgba(192,80,77,.10);--zone:rgba(20,20,19,.025);--zone-line:#D1CFC5;--serif:ui-serif,Georgia,'Times New Roman',serif;--sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,monospace}
+html.dark{--bg:#141413;--surface:#1F1F1D;--surface2:#2A2A28;--ink:#FAF9F5;--body:#D1CFC5;--muted:#87867F;--line:#3D3D3A;--line-soft:#2A2A28;--clay:#E48A6E;--clay-soft:rgba(228,138,110,.14);--olive:#9DB07C;--olive-soft:rgba(157,176,124,.16);--gold:#D4B36F;--gold-soft:rgba(212,179,111,.14);--blue:#3d798b;--blue-soft:rgba(127,163,188,.14);--purple:#B08FD0;--purple-soft:rgba(176,143,208,.14);--red:#D97070;--red-soft:rgba(217,112,112,.14);--zone:rgba(250,249,245,.03);--zone-line:#3D3D3A}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;overflow:hidden}
+.bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--line-soft);flex:none}
+.bar h1{font-family:var(--serif);font-weight:500;font-size:19px;color:var(--ink)}
+.bar .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.spacer{flex:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .15s}
+.chip:hover{color:var(--ink);border-color:var(--muted)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+#themeToggle{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+#themeToggle:hover{color:var(--ink);border-color:var(--muted)}
+.stage{flex:1;position:relative;min-height:0;overflow:hidden}
+.stage svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.zone rect{fill:var(--zone);stroke:var(--zone-line);stroke-width:1;stroke-dasharray:5 5;rx:16}
+.zone .ztitle{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;fill:var(--muted)}
+.zone .zsub{font-family:var(--mono);font-size:10.5px;fill:var(--muted);opacity:.75}
+.node{cursor:pointer}
+.node rect{fill:var(--surface);stroke:var(--line);stroke-width:1.5;rx:10;transition:stroke .15s}
+.node:hover rect{stroke:var(--muted)}
+.node.sel rect{stroke:var(--clay)!important;stroke-width:2}
+.node .t{font-family:var(--sans);font-size:14.5px;font-weight:600;fill:var(--ink);pointer-events:none}
+.node .m{font-family:var(--mono);font-size:11px;fill:var(--muted);pointer-events:none}
+.node .k{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;fill:var(--clay);pointer-events:none}
+.node.gate rect{fill:var(--olive-soft);stroke:var(--olive)}
+.node.store rect{fill:var(--surface2)}
+.node.ai rect{fill:var(--purple-soft);stroke:var(--purple)}
+.node.data rect{fill:var(--blue-soft);stroke:var(--blue)}
+.node.ext rect{stroke-dasharray:6 3}
+.node.star rect{fill:var(--gold-soft);stroke:var(--gold)}
+.edge{stroke:var(--muted);stroke-width:1.6;fill:none;marker-end:url(#am);transition:opacity .2s}
+.edge.ws{stroke-width:2}
+.edge.dash{stroke-dasharray:5 4}
+.elbl{font-family:var(--mono);font-size:10.5px;fill:var(--muted);transition:opacity .2s}
+.stage.flowing .edge{opacity:.13}
+.stage.flowing .elbl{opacity:.13}
+.stage.flowing .node{opacity:.30}
+.stage.flowing .zone{opacity:.45}
+.stage.flowing .edge.lit{opacity:1;stroke:var(--clay);marker-end:url(#ac);stroke-dasharray:7 5;animation:march .9s linear infinite}
+.stage.flowing .elbl.lit{opacity:1;fill:var(--clay)}
+.stage.flowing .node.lit{opacity:1}
+.stage.flowing .node.lit rect{stroke:var(--clay)}
+@keyframes march{to{stroke-dashoffset:-12}}
+@media(prefers-reduced-motion:reduce){.stage.flowing .edge.lit{animation:none}}
+.badge{font-family:var(--mono);font-size:11px;font-weight:700}
+.badge circle{fill:var(--clay)}
+.badge text{fill:var(--bg)}
+.stage:not(.flowing) .badge{display:none}
+.card{position:absolute;max-width:360px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:0 6px 24px rgba(0,0,0,.08);z-index:10}
+#detail{right:16px;bottom:16px;width:340px}
+#detail h3{font-family:var(--serif);font-weight:500;font-size:17px;color:var(--ink);margin-bottom:2px}
+#detail .meta{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-bottom:8px}
+#detail p{font-size:12.5px;line-height:1.55}
+#flowcap{left:16px;bottom:16px;max-width:460px;display:none}
+#flowcap.show{display:block}
+#flowcap .fname{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--clay);margin-bottom:6px}
+#flowcap ol{margin-left:18px}
+#flowcap li{font-size:12.5px;line-height:1.55}
+.src{position:absolute;top:10px;right:16px;font-family:var(--mono);font-size:10px;color:var(--muted);opacity:.8;z-index:5}
+#democard{position:absolute;top:74px;right:16px;width:400px;z-index:20;background:var(--surface);border:2px solid var(--gold);border-radius:12px;padding:18px 20px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+#democard.show{display:block}
+#democard h3{font-family:var(--serif);font-weight:600;font-size:17px;color:var(--gold);margin-bottom:4px}
+#democard .tag{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+#democard p{font-size:12.5px;margin-bottom:6px;line-height:1.55}
+#democard .badges{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 0}
+#democard .badges span{font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+#dc{background:none;border:none;position:absolute;right:14px;top:12px;font-size:18px;cursor:pointer;color:var(--muted);line-height:1}
+@media(max-width:880px){body{overflow:auto}.stage{min-height:70vh}#detail{position:static;width:auto;margin:10px 16px}#flowcap{position:static;margin:0 16px 16px}#democard{position:static;width:auto;margin:10px}}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div>
+    <h1>Diem Tin AI</h1>
+    <div class="sub">NestJS + Next.js · RAG Q&A · OpenRouter · Ollama · pgvector</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="chips" id="chips">
+    <button class="chip on" data-flow="all">Tất cả</button>
+    <button class="chip" data-flow="ingest">Pipeline thu thập</button>
+    <button class="chip" data-flow="qa">Hỏi đáp RAG</button>
+    <button class="chip" data-flow="features">AI Features</button>
+    <button class="chip" data-flow="fcheck">Fact-Check ⭐</button>
+    <button class="chip" data-flow="sql">SQL Analytics</button>
+  </div>
+  <button id="demoBtn" style="font-family:var(--mono)">⭐ Demo</button>
+  <button id="themeToggle">Theme</button>
+</div>
+
+<div class="stage" id="stage">
+<svg viewBox="0 0 1600 960" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Diem Tin AI architecture diagram">
+  <defs>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="var(--muted)"/></marker>
+    <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="var(--clay)"/></marker>
+  </defs>
+
+  <!-- ZONES -->
+  <g class="zone"><rect x="30" y="90" width="210" height="300"/><text class="ztitle" x="50" y="118">Nguồn tin</text><text class="zsub" x="50" y="136">7 RSS feeds</text></g>
+  <g class="zone"><rect x="270" y="90" width="280" height="340"/><text class="ztitle" x="290" y="118">Pipeline thu thập</text><text class="zsub" x="290" y="136">BullMQ + Ollama ingestion (:11435)</text></g>
+  <g class="zone"><rect x="580" y="90" width="210" height="320"/><text class="ztitle" x="600" y="118">PostgreSQL + pgvector</text><text class="zsub" x="600" y="136">vector(1024) HNSW · GIN tsvector</text></g>
+  <g class="zone"><rect x="820" y="90" width="210" height="340"/><text class="ztitle" x="840" y="118">AI Engine</text><text class="zsub" x="840" y="136">OpenRouter (cloud) + LangChain</text></g>
+  <g class="zone"><rect x="1060" y="90" width="280" height="560"/><text class="ztitle" x="1080" y="118">Business Logic</text><text class="zsub" x="1080" y="136">NestJS · 14 modules</text></g>
+  <g class="zone"><rect x="1370" y="90" width="200" height="560"/><text class="ztitle" x="1390" y="118">Frontend</text><text class="zsub" x="1390" y="136">Next.js 16 · React 19</text></g>
+  <g class="zone"><rect x="580" y="440" width="450" height="200"/><text class="ztitle" x="600" y="468">Infra</text><text class="zsub" x="600" y="486">Docker · Ollama x2 · GitHub Actions</text></g>
+
+  <!-- EDGES: INGESTION -->
+  <path class="edge" id="e1i" d="M240,180 L270,180"/>
+  <path class="edge" id="e2i" d="M370,200 L370,240"/>
+  <path class="edge" id="e3i" d="M370,290 L370,330"/>
+  <path class="edge" id="e4i" d="M370,410 L420,410 L550,410"/>
+  <path class="edge" id="e5i" d="M550,410 L580,410"/>
+  <path class="edge" id="e6i" d="M370,410 L370,460 L1000,460 L1000,555 L900,555"/>
+  <path class="edge dash" id="e7i" d="M900,555 L900,410 L580,410"/>
+
+  <!-- EDGES: Q&A -->
+  <path class="edge ws" id="e1q" d="M1475,200 L1370,200"/>
+  <path class="edge" id="e2q" d="M1220,265 L1220,200 L1090,200"/>
+  <path class="edge" id="e3q" d="M1090,200 L1090,490 L895,490 L895,555 L900,555"/>
+  <path class="edge dash" id="e4q" d="M580,230 C 580,490 1090,490 1090,200"/>
+  <path class="edge" id="e5q" d="M1090,200 L1045,110 L920,110 L920,190 L820,190"/>
+  <path class="edge ws" id="e6q" d="M820,280 C 900,110 1120,110 1120,265 L1220,265"/>
+  <path class="edge ws" id="e7q" d="M1340,265 L1420,265 L1475,200"/>
+
+  <!-- EDGES: FACT-CHECK -->
+  <path class="edge" id="e1f" d="M1220,410 L1220,200 L1090,200"/>
+  <path class="edge ws" id="e2f" d="M820,280 L900,300 L1020,300 L1020,420 L1090,420"/>
+  <path class="edge" id="e3f" d="M1220,410 L1090,410"/>
+
+  <!-- EDGES: AI FEATURES (summary, brief, timeline, compare, rewrite, event analysis, recap, year review, suggest questions) -->
+  <path class="edge" id="e1fe" d="M580,340 C 700,340 1060,340 1060,340"/>
+  <path class="edge" id="e2fe" d="M580,390 C 700,390 1060,390 1060,390"/>
+  <path class="edge" id="e3fe" d="M580,440 C 700,440 1060,440 1060,440"/>
+
+  <!-- EDGES: SQL ANALYTICS -->
+  <path class="edge" id="e1sq" d="M1475,450 L1340,450"/>
+  <path class="edge" id="e2sq" d="M1340,450 L1340,555 L900,555"/>
+
+  <!-- EDGE LABELS -->
+  <text class="elbl" data-e="e1i" x="248" y="174">7 RSS feeds → parser</text>
+  <text class="elbl" data-e="e2i" x="382" y="224">Readability HTML extract</text>
+  <text class="elbl" data-e="e3i" x="382" y="316">~400 tok chunks, 50 overlap</text>
+  <text class="elbl" data-e="e4i" x="460" y="402">1024-dim vector chunks</text>
+  <text class="elbl" data-e="e5i" x="558" y="400">pgvector HNSW upsert</text>
+  <text class="elbl" data-e="e6i" x="670" y="540">embed batch via Ollama ingest :11435</text>
+  <text class="elbl" data-e="e7i" x="740" y="422">write Article + Chunk rows</text>
+
+  <text class="elbl" data-e="e1q" x="1400" y="192">EventSource SSE</text>
+  <text class="elbl" data-e="e2q" x="1140" y="235">ChatService.stream()</text>
+  <text class="elbl" data-e="e3q" x="980" y="538">embed() = Ollama chat :11434</text>
+  <text class="elbl" data-e="e4q" x="845" y="365">hybrid search: vector + FTS + RRF</text>
+  <text class="elbl" data-e="e5q" x="945" y="100">build context [1]…[5] + citations</text>
+  <text class="elbl" data-e="e6q" x="1000" y="155">streamAnswer() = OpenRouter reasoning tier</text>
+  <text class="elbl" data-e="e7q" x="1390" y="240">stream tokens SSE → UI</text>
+
+  <text class="elbl" data-e="e1f" x="1170" y="295">retrieve 12 chunks</text>
+  <text class="elbl" data-e="e2f" x="900" y="385">generateStructured() JSON Schema</text>
+  <text class="elbl" data-e="e3f" x="1160" y="400">verdict + confidence + analysis</text>
+
+  <text class="elbl" data-e="e1fe" x="820" y="332">summary / brief / timeline</text>
+  <text class="elbl" data-e="e2fe" x="820" y="382">compare / rewrite / event analysis</text>
+  <text class="elbl" data-e="e3fe" x="820" y="432">recap / year review / suggest questions</text>
+
+  <text class="elbl" data-e="e1sq" x="1400" y="440">SQL queries</text>
+  <text class="elbl" data-e="e2sq" x="1140" y="540">usage by feature / model</text>
+
+  <!-- NODES: SOURCES -->
+  <g class="node ext" data-k="vne"><rect x="50" y="155" width="170" height="43"/><text class="t" x="65" y="177">VnExpress</text><text class="m" x="65" y="192">RSS</text></g>
+  <g class="node ext" data-k="tt"><rect x="50" y="213" width="170" height="43"/><text class="t" x="65" y="235">Touitre</text><text class="m" x="65" y="250">RSS</text></g>
+  <g class="node ext" data-k="tn"><rect x="50" y="271" width="170" height="43"/><text class="t" x="65" y="293">Thanh Nien</text><text class="m" x="65" y="308">RSS</text></g>
+  <g class="node ext" data-k="vnn"><rect x="50" y="329" width="170" height="43"/><text class="t" x="65" y="351">VietNamNet</text><text class="m" x="65" y="366">RSS</text></g>
+
+  <!-- NODES: INGESTION -->
+  <g class="node" data-k="rss"><rect x="280" y="150" width="180" height="53"/><text class="t" x="295" y="172">RSS Parser</text><text class="m" x="295" y="190">dedup URL</text></g>
+  <g class="node" data-k="ext"><rect x="280" y="222" width="180" height="53"/><text class="t" x="295" y="244">Content Extractor</text><text class="m" x="295" y="262">Readability + SHA-256 hash</text></g>
+  <g class="node" data-k="chunk"><rect x="280" y="294" width="180" height="50"/><text class="t" x="295" y="316">Sentence Chunker</text><text class="m" x="295" y="334">~400 tok, 50 word overlap</text></g>
+  <g class="node ai store" data-k="embi"><rect x="280" y="363" width="180" height="50"/><text class="t" x="295" y="385">Ollama Embed (ingest)</text><text class="m" x="295" y="403">bge-m3 :11435 · batch</text></g>
+
+  <!-- NODES: STORAGE -->
+  <g class="node store data" data-k="pg"><rect x="590" y="150" width="180" height="65"/><text class="t" x="605" y="172">PostgreSQL + pgvector</text><text class="m" x="605" y="192">Article · Chunk · Event · Cache</text><text class="m" x="605" y="208">HNSW index · tsvector</text></g>
+  <g class="node store" data-k="redis"><rect x="590" y="240" width="180" height="50"/><text class="t" x="605" y="262">Redis 7</text><text class="m" x="605" y="280">BullMQ queues</text></g>
+
+  <!-- NODES: AI ENGINE -->
+  <g class="node ai" data-k="or"><rect x="830" y="150" width="190" height="60"/><text class="t" x="845" y="175">OpenRouter</text><text class="m" x="845" y="195">cloud LLM API</text></g>
+  <g class="node ai" data-k="lc"><rect x="830" y="235" width="190" height="50"/><text class="t" x="845" y="255">LangChain ChatOpenAI</text><text class="m" x="845" y="273">generate() + stream()</text></g>
+  <g class="node ai" data-k="tier"><rect x="830" y="308" width="190" height="50"/><text class="t" x="845" y="330">Model Tier x 3</text><text class="m" x="845" y="348">nano / standard / reasoning</text></g>
+  <g class="node ai" data-k="fb"><rect x="830" y="378" width="190" height="50"/><text class="t" x="845" y="400">Fallback + Timeout</text><text class="m" x="845" y="418">AbortController 60s</text></g>
+
+  <!-- NODES: BUSINESS LOGIC -->
+  <g class="node gate" data-k="retrieval"><rect x="1080" y="175" width="240" height="50"/><text class="t" x="1095" y="197">Retrieval Module</text><text class="m" x="1095" y="215">hybrid search · build context</text></g>
+  <g class="node" data-k="chat"><rect x="1080" y="240" width="240" height="50"/><text class="t" x="1095" y="262">Chat Module</text><text class="m" x="1095" y="280">rewrite · SSE stream · citations</text></g>
+  <g class="node" data-k="articles"><rect x="1080" y="315" width="240" height="50"/><text class="t" x="1095" y="337">Articles Module</text><text class="m" x="1095" y="355">summary · brief · timeline · compare</text></g>
+  <g class="node star" data-k="fcheck"><rect x="1080" y="390" width="240" height="50"/><text class="t" x="1095" y="412">Fact-Check Module ⭐</text><text class="m" x="1095" y="430">structured JSON Schema · web plugin</text></g>
+  <g class="node" data-k="revent"><rect x="1080" y="465" width="240" height="50"/><text class="t" x="1095" y="487">Events Module</text><text class="m" x="1095" y="505">cluster · hotness · rising · blind spots</text></g>
+  <g class="node" data-k="meta"><rect x="1080" y="540" width="240" height="50"/><text class="t" x="1095" y="562">Meta · Usage · Period</text><text class="m" x="1095" y="580">sources · entities · FinOps · recap</text></g>
+
+  <!-- NODES: FRONTEND -->
+  <g class="node" data-k="fchat"><rect x="1390" y="175" width="160" height="43"/><text class="t" x="1405" y="197">/ Chat</text><text class="m" x="1405" y="212">RAG SSE</text></g>
+  <g class="node" data-k="ffact"><rect x="1390" y="240" width="160" height="43"/><text class="t" x="1405" y="262">/ Fact-Check</text><text class="m" x="1405" y="277">verdict + confidence</text></g>
+  <g class="node" data-k="fbrief"><rect x="1390" y="305" width="160" height="43"/><text class="t" x="1405" y="327">/ Brief · Timeline</text><text class="m" x="1405" y="342">AI features</text></g>
+  <g class="node" data-k="fevents"><rect x="1390" y="370" width="160" height="43"/><text class="t" x="1405" y="392">/ Events</text><text class="m" x="1405" y="407">cluster · metadata</text></g>
+  <g class="node" data-k="fdash"><rect x="1390" y="435" width="160" height="43"/><text class="t" x="1405" y="457">/ Dashboard</text><text class="m" x="1405" y="472">cost · insights</text></g>
+
+  <!-- NODES: INFRA -->
+  <g class="node ext" data-k="docker"><rect x="605" y="480" width="190" height="50"/><text class="t" x="625" y="502">Docker Compose</text><text class="m" x="625" y="520">6 containers</text></g>
+  <g class="node ext" data-k="ci"><rect x="605" y="555" width="190" height="43"/><text class="t" x="625" y="577">GitHub Actions</text><text class="m" x="625" y="592">lint · test · build</text></g>
+  <g class="node ext" data-k="ollama"><rect x="820" y="480" width="190" height="55"/><text class="t" x="840" y="502">Ollama x 2</text><text class="m" x="840" y="520">chat :11434 · ingest :11435</text></g>
+  <g class="node ext" data-k="ns"><rect x="820" y="555" width="190" height="43"/><text class="t" x="840" y="577">NestJS 11 + Next.js 16</text><text class="m" x="840" y="592">back + front</text></g>
+
+  <!-- BADGES: INGESTION -->
+  <g class="badge" data-flow="ingest"><circle cx="280" cy="150" r="9"/><text x="280" y="154" text-anchor="middle">1</text></g>
+  <g class="badge" data-flow="ingest"><circle cx="370" cy="222" r="9"/><text x="370" y="226" text-anchor="middle">2</text></g>
+  <g class="badge" data-flow="ingest"><circle cx="370" cy="294" r="9"/><text x="370" y="298" text-anchor="middle">3</text></g>
+  <g class="badge" data-flow="ingest"><circle cx="370" cy="363" r="9"/><text x="370" y="367" text-anchor="middle">4</text></g>
+  <g class="badge" data-flow="ingest"><circle cx="370" cy="410" r="9"/><text x="370" y="414" text-anchor="middle">5</text></g>
+
+  <!-- BADGES: Q&A -->
+  <g class="badge" data-flow="qa"><circle cx="1475" cy="200" r="9"/><text x="1475" y="204" text-anchor="middle">1</text></g>
+  <g class="badge" data-flow="qa"><circle cx="1220" cy="265" r="9"/><text x="1220" y="269" text-anchor="middle">2</text></g>
+  <g class="badge" data-flow="qa"><circle cx="895" cy="555" r="9"/><text x="895" y="559" text-anchor="middle">3</text></g>
+  <g class="badge" data-flow="qa"><circle cx="580" cy="230" r="9"/><text x="580" y="234" text-anchor="middle">4</text></g>
+  <g class="badge" data-flow="qa"><circle cx="1045" cy="110" r="9"/><text x="1045" y="114" text-anchor="middle">5</text></g>
+  <g class="badge" data-flow="qa"><circle cx="820" cy="280" r="9"/><text x="820" y="284" text-anchor="middle">6</text></g>
+  <g class="badge" data-flow="qa"><circle cx="1340" cy="265" r="9"/><text x="1340" y="269" text-anchor="middle">7</text></g>
+
+  <!-- BADGES: FACT-CHECK -->
+  <g class="badge" data-flow="fcheck"><circle cx="1475" cy="262" r="9"/><text x="1475" y="266" text-anchor="middle">1</text></g>
+  <g class="badge" data-flow="fcheck"><circle cx="1220" cy="410" r="9"/><text x="1220" y="414" text-anchor="middle">2</text></g>
+
+  <!-- BADGES: AI FEATURES -->
+  <g class="badge" data-flow="features"><circle cx="580" cy="340" r="9"/><text x="580" y="344" text-anchor="middle">1</text></g>
+  <g class="badge" data-flow="features"><circle cx="580" cy="440" r="9"/><text x="580" y="444" text-anchor="middle">2</text></g>
+
+  <!-- BADGES: SQL ANALYTICS -->
+  <g class="badge" data-flow="sql"><circle cx="1475" cy="457" r="9"/><text x="1475" y="461" text-anchor="middle">1</text></g>
+  <g class="badge" data-flow="sql"><circle cx="1340" cy="555" r="9"/><text x="1340" y="559" text-anchor="middle">2</text></g>
+</svg>
+
+  <div class="src">D:\Chatbot_QA · architecture-flow.html</div>
+
+  <div class="card" id="flowcap">
+    <div class="fname" id="fname"></div>
+    <ol id="fsteps"></ol>
+  </div>
+
+  <div class="card" id="detail">
+    <h3 id="dtitle">Nhấn vào khối bất kỳ</h3>
+    <div class="meta" id="dmeta">chi tiết thành phần</div>
+    <p id="dbody">Mỗi box đều click được. Filter flow ở trên → xem đường nối sáng lên.</p>
+  </div>
+
+  <div class="card" id="democard">
+    <button id="dc">&times;</button>
+    <div class="tag" style="margin-bottom:6px">⭐ Demo Module</div>
+    <h3>Fact-Check with OpenRouter</h3>
+    <p>1. User input claim → hybrid retrieval 12 chunks</p>
+    <p>2. generateStructured() → JSON Schema { verdict, confidence, analysis }</p>
+    <p>3. Fallback to regex nếu model free không tôn schema</p>
+    <p>4. Optional web plugin cross-check bên ngoài</p>
+    <div class="badges"><span>OpenRouter</span><span>JSON Schema</span><span>Web plugin</span><span>pgvector</span><span>Hybrid search</span></div>
+  </div>
+</div>
+
+<script>
+const DETAIL = {
+  vne:   { t:"VnExpress", m:"RSS feed", b:"Nguồn tin tức chính. RSS feed được crawl định kỳ bởi BullMQ." },
+  tt:    { t:"Touitre", m:"RSS feed", b:"Nguồn tin tức phụ. RSS feed được crawl định kỳ." },
+  tn:    { t:"Thanh Nien", m:"RSS feed", b:"Nguồn tin tức phụ. RSS feed được crawl định kỳ." },
+  vnn:   { t:"VietNamNet", m:"RSS feed", b:"Nguồn tin tức phụ. RSS feed được crawl định kỳ." },
+  rss:   { t:"RSS Parser", m:"ingestion step 1", b:"Parse RSS XML, lấy URL bài viết. Dedup bằng URL hash, skip nếu đã tồn tại trong DB." },
+  ext:   { t:"Content Extractor", m:"ingestion step 2", b:"Dùng Readability để extract nội dung HTML sang text thuần. SHA-256 hash để phát hiện trùng lặp." },
+  chunk: { t:"Sentence Chunker", m:"ingestion step 3", b:"Chunk content thành segments ~400 tokens, 50 token overlap. Dùng cho retrieval sau này." },
+  embi:  { t:"Ollama Embed (ingest)", m:":11435 · batch", b:"Instance riêng trên port 11435. Embed batch hàng trăm chunks cùng lúc, không ảnh hưởng chat.\n<b>Không phải OpenRouter.</b>" },
+  pg:    { t:"PostgreSQL + pgvector", m:"source of truth", b:"Article, Chunk (vector 1024 HNSW index), Event, Message, LlmUsage FinOps cache.\nGIN tsvector cho fulltext search. Hybrid search = cosine + tsvector + RRF." },
+  redis: { t:"Redis 7", m:"BullMQ", b:"Job queues cho ingestion pipeline: parse → extract → chunk → embed → write." },
+  or:    { t:"OpenRouter", m:"cloud LLM API", b:"Tất cả LLM calls đều qua OpenRouter. Dùng ChatOpenAI wrapper + raw fetch. temperature 0.2, timeout 60s, manual fallback chain." },
+  lc:    { t:"LangChain ChatOpenAI", m:"AI wrapper", b:"Wrapper gọi OpenRouter API. <code>streamAnswer()</code> cho chat Q&A, <code>generate()</code> cho single-shot, <code>generateStructured()</code> JSON Schema cho fact-check." },
+  tier:  { t:"Model Tier x 3", m:"nano / standard / reasoning", b:"rewrite = nano tier (rẻ). summary = standard tier. chat + factcheck = reasoning tier. Mỗi tier chain model + fallback." },
+  fb:    { t:"Fallback + Timeout", m:"AbortController 60s", b:"Mỗi model thử có timeout 60s. <code>manual fallback</code> chỉ đổi model khi yielded === 0 tokens." },
+  retrieval: { t:"Retrieval Module", m:"hybrid search", b:"embed query qua Ollama chat :11434 → cosine <=> pgvector + tsvector search + RRF k=60. Recency boost 7 ngày. Top 5 → context [1]..[5] + citations + confidence badge." },
+  chat: { t:"Chat Module", m:"Q&A stream", b:"rewrite followup (nano tier) → hybrid retrieval → OpenRouter reasoning tier → streamAnswer() → SSE tokens." },
+  articles: { t:"Articles Module", m:"AI features", b:"summary / brief / timeline / compare / rewrite — single-shot <code>generate()</code> qua OpenRouter standard tier. Kết quả cache DB." },
+  fcheck: { t:"Fact-Check Module ⭐", m:"structured JSON", b:"12 chunks → <code>generateStructured()</code> OpenRouter reasoning tier → JSON Schema { verdict, confidence, analysis }. Fallback regex nếu model không tôn schema. Web plugin opt-in cross-check." },
+  revent: { t:"Events Module", m:"zero LLM", b:"Greedy cosine >= 0.72 cluster (không dùng LLM). Hotness = source diversity*3 + count + recency. Rising = velocity F5. Blind spots = sourceCount === 1." },
+  meta: { t:"Meta · Usage · Period", m:"FinOps + recap", b:"Sources first-to-report, NER heuristic. LlmUsage FinOps per feature. Period recap <code>generate()</code>, year review <code>generate()</code>." },
+  docker: { t:"Docker Compose", m:"6 containers", b:"PostgreSQL + pgvector, Redis 7, Ollama :11434, Ollama :11435, NestJS server, Next.js frontend." },
+  ci: { t:"GitHub Actions", m:"CI/CD", b:"Lint, test, build trên mỗi push. Deploy Docker images lên server." },
+  ollama: { t:"Ollama x 2", m:":11434 + :11435", b:"<b>2 instance riêng biệt.</b> Instance chat (:11434) phục vụ embedding cho retrieval — nhanh ~1s/req. Instance ingest (:11435) batch chunks — không block chat.\n<b>Không phải OpenRouter.</b> Ollama chỉ làm embedding, không làm LLM text generation." },
+  ns: { t:"NestJS 11 + Next.js 16", m:"back + front", b:"Server NestJS 11 với 14 modules. Frontend Next.js 16 với React 19, SSR + static export." },
+  fchat: { t:"/ Chat", m:"RAG SSE", b:"EventSource streaming Q&A, cited sources với confidence badge." },
+  ffact: { t:"/ Fact-Check", m:"verdict UI", b:"Input claim → OpenRouter structured output → verdict + confidence + analysis. Opt-in web cross-check." },
+  fbrief: { t:"/ Brief · Timeline", m:"AI features UI", b:"AI-generated brief daily, chronological timeline, cross-source compare." },
+  fevents: { t:"/ Events", m:"media intelligence", b:"Hot events wall, rising detection, blind spots radar. Không dùng LLM." },
+  fdash: { t:"/ Dashboard", m:"FinOps UI", b:"LLM usage by feature/model chart, pure SQL analytics, trending keywords." }
+};
+
+const FLOWS = {
+  ingest: {
+    name: "Pipeline thu thập — từ RSS → vector DB",
+    edges: ["e1i","e2i","e3i","e4i","e5i","e6i","e7i"],
+    nodes: ["rss","ext","chunk","embi","pg"],
+    steps: ["<b>7 RSS feeds</b> → RSS Parser: parse XML, dedup URL", "<b>Content Extractor</b>: Readability HTML→text, SHA-256 hash", "<b>Sentence Chunker</b>: segments ~400 tok, 50 overlap", "<b>Ollama Embed (ingest :11435)</b>: batch embed chunks → 1024-dim", "<b>pgvector</b>: upsert vector + write Article + Chunk rows"]
+  },
+  qa: {
+    name: "Hỏi đáp RAG — từ câu hỏi → stream câu trả lời",
+    edges: ["e1q","e2q","e3q","e4q","e5q","e6q","e7q"],
+    nodes: ["fchat","chat","retrieval","pg","or","lc"],
+    steps: ["<b>EventSource SSE</b> từ / Chat UI → ChatService.stream()", "<b>Chat Module</b>: rewrite followup dùng OpenRouter nano tier", "<b>Ollama chat :11434</b>: embed query → vector 1024-dim", "<b>Retrieval Module</b>: hybrid search (cosine + FTS + RRF) → top 5", "<b>Build context</b>: [1]…[5] + citations + confidence", "<b>OpenRouter reasoning tier</b>: streamAnswer() tokens SSE"]
+  },
+  features: {
+    name: "AI Features — single-shot generate",
+    edges: ["e1fe","e2fe","e3fe"],
+    nodes: ["articles","meta","or","lc"],
+    steps: ["<b>Articles Module</b>: summary / brief / timeline / compare / rewrite — đều single-shot generate()", "<b>Events Module</b>: cluster greedy cosine (zero LLM), hotness F5 rising", "<b>Meta Module</b>: recap / year review generate(), LlmUsage FinOps"]
+  },
+  fcheck: {
+    name: "Fact-Check ⭐ — structured JSON",
+    edges: ["e1f","e2f","e3f"],
+    nodes: ["ffact","fcheck","retrieval","or","lc"],
+    steps: ["<b>Input claim</b> từ / Fact-Check UI → hybrid retrieval 12 chunks", "<b>generateStructured()</b> OpenRouter reasoning tier → JSON Schema forced", "<b>Return</b>: verdict (boolean) + confidence (0-1) + analysis (string). Fallback regex"]
+  },
+  sql: {
+    name: "SQL Analytics — FinOps + insights",
+    edges: ["e1sq","e2sq"],
+    nodes: ["fdash","meta","pg"],
+    steps: ["<b>Dashboard</b> gửi SQL query đến Meta Module", "<b>Pure SQL</b>: LlmUsage aggregation by feature + model → chart"]
+  }
+};
+
+const stage = document.getElementById('stage');
+const nodes = document.querySelectorAll('.node');
+const edges = document.querySelectorAll('.edge');
+const elbls = document.querySelectorAll('.elbl');
+const chips = document.querySelectorAll('.chip');
+const fcap = document.getElementById('flowcap');
+
+function setFlow(key) {
+  chips.forEach(c => c.classList.toggle('on', c.dataset.flow === key));
+  edges.forEach(e => e.classList.remove('lit'));
+  elbls.forEach(l => l.classList.remove('lit'));
+  nodes.forEach(n => n.classList.remove('lit'));
+  if (key === 'all') { stage.classList.remove('flowing'); fcap.classList.remove('show'); return; }
+  const f = FLOWS[key];
+  stage.classList.add('flowing');
+  f.edges.forEach(id => document.getElementById(id)?.classList.add('lit'));
+  elbls.forEach(l => { if (f.edges.includes(l.dataset.e)) l.classList.add('lit'); });
+  f.nodes.forEach(k => document.querySelector(`.node[data-k="${k}"]`)?.classList.add('lit'));
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('fsteps').innerHTML = f.steps.map(s => `<li>${s}</li>`).join('');
+  fcap.classList.add('show');
+}
+chips.forEach(c => c.addEventListener('click', () => setFlow(c.dataset.flow)));
+
+nodes.forEach(n => n.addEventListener('click', () => {
+  nodes.forEach(x => x.classList.remove('sel'));
+  n.classList.add('sel');
+  const d = DETAIL[n.dataset.k];
+  if (!d) return;
+  document.getElementById('dtitle').textContent = d.t;
+  document.getElementById('dmeta').textContent = d.m;
+  document.getElementById('dbody').innerHTML = d.b;
+}));
+
+document.getElementById('demoBtn').addEventListener('click', () => {
+  document.getElementById('democard').classList.toggle('show');
+  setFlow('fcheck');
+});
+document.getElementById('dc').addEventListener('click', () => document.getElementById('democard').classList.remove('show'));
+
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const dark = !document.documentElement.classList.contains('dark');
+  document.documentElement.classList.toggle('dark', dark);
+  localStorage.setItem('theme', dark ? 'dark' : 'light');
+});
+</script>
+</body>
+</html>
