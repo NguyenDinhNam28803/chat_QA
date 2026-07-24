@@ -13,6 +13,7 @@
 - [Đây là gì? (RAG, không phải train model)](#-đây-là-gì-rag-không-phải-train-model)
 - [Tính năng](#-tính-năng)
 - [Kiến trúc](#-kiến-trúc)
+- [Kiến trúc các Module chi tiết](#-kiến-trúc-các-module-chi-tiết)
 - [Lĩnh vực dữ liệu & luồng xử lý chi tiết (file + hàm)](#-lĩnh-vực-dữ-liệu--luồng-xử-lý-chi-tiết-file--hàm)
 - [Tech stack](#-tech-stack)
 - [Bắt đầu nhanh](#-bắt-đầu-nhanh)
@@ -123,6 +124,274 @@ flowchart LR
 ```
 
 **Điểm mấu chốt:** chat và ingestion dùng **2 Ollama riêng** (cùng model `bge-m3` → vector 1024) nên nạp tin nền không "bỏ đói" việc embed câu hỏi của chat.
+
+---
+
+## 📦 Kiến trúc các Module chi tiết
+
+### Tổng quan 15 Module
+
+| Module | Chức năng chính |
+|--------|----------------|
+| **Prisma** | ORM kết nối PostgreSQL (global) |
+| **Config** | Cấu hình Redis connection |
+| **Embedding** | Tạo vector embedding bằng Ollama bge-m3 (1024 chiều) |
+| **LLM** | Quản lý LLM qua OpenRouter (streaming, fallback, structured output) |
+| **Retrieval** | Hybrid search (vector + FTS + RRF + recency boost) |
+| **Ingestion** | Thu thập tin từ RSS, chunk, embed, phân loại topic |
+| **Chat** | Xử lý chat real-time với streaming SSE |
+| **Articles** | Quản lý bài viết + AI features (summary, brief, timeline) |
+| **Events** | Cluster articles thành sự kiện, phân tích xu hướng |
+| **Factcheck** | Kiểm chứng thông tin (corpus + web) |
+| **Entities** | Trích xuất thực thể từ tiêu đề bài báo |
+| **Sources** | Phân tích hiệu suất từng nguồn tin |
+| **Periods** | Tổng kết tin theo quý/năm |
+| **Usage** | Ghi nhận chi phí/tokens LLM |
+| **Health** | Kiểm tra trạng thái hệ thống |
+
+### Chi tiết từng Module
+
+#### 1. Prisma Module (Global Infrastructure)
+- **Mục đích**: Kết nối ORM tới PostgreSQL
+- **Components**: `PrismaService` extends `PrismaClient`
+- **Dependencies**: Được inject vào hầu hết mọi module
+
+#### 2. Config Module
+- **Mục đích**: Cấu hình Redis connection
+- **File**: `redis.config.ts`
+- **Dependencies**: Được dùng bởi `IngestionModule`
+
+#### 3. Embedding Module (Core)
+- **Mục đích**: Tạo vector embedding bằng Ollama bge-m3
+- **2 instance riêng biệt**:
+  - `:11434` cho chat/retrieval
+  - `:11435` cho ingestion
+- **Components**:
+  - `EmbeddingService`: `embed(text)`, `embedBatch(texts)`
+  - `vector.util.ts`: `cosineSimilarity()`, `centroid()`, `titleBodyScore()`
+- **Env vars**: `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIM`
+
+#### 4. LLM Module (Core AI Layer)
+- **Mục đích**: Quản lý mọi tương tác với LLM qua OpenRouter
+- **Components**:
+  - `LlmService`:
+    - `streamAnswer()` - Streaming chat (tier: reasoning)
+    - `generate()` - Single-shot generation
+    - `generateStructured()` - Forced JSON output (cho factcheck)
+    - `generateWeb()` - Web-augmented generation
+  - `qa.prompt.ts` - Prompt cho QA chat
+  - `features.prompts.ts` - Prompts cho tất cả features
+- **Dependencies**: `UsageModule` (ghi token usage)
+
+#### 5. Retrieval Module (Core RAG Pipeline)
+- **Mục đích**: Tìm kiếm hybrid với RRF + recency boost
+- **Components**:
+  - `RetrievalService.search()`:
+    - Embed query → vector search (pgvector `<=>`)
+    - FTS (tsvector)
+    - RRF fusion + recency boost
+    - Trả về `RetrievalResult`
+  - `context.builder.ts`:
+    - Tạo context string `[1]...[2]...`
+    - Danh sách citations
+    - Confidence score (high/medium/low)
+- **Dependencies**: `EmbeddingModule`, `PrismaModule`
+
+#### 6. Ingestion Module (Data Pipeline)
+- **Mục đích**: Thu thập tin tức từ RSS feeds Việt Nam
+- **Components**:
+  - `IngestionService.ingestFeed()`:
+    - Fetch RSS → Extract text → Chunk → Embed → Classify topic → Save
+  - `IngestionProcessor`: BullMQ WorkerHost
+  - `IngestionScheduler`: Cron 30 phút
+  - `RssService`: Parse RSS, limit 60 items/feed
+  - `ContentExtractorService`: Readability.js + cheerio fallback
+  - `ChunkService`: Sentence-aware chunking (~400 tokens)
+  - `topic.classifier.ts`: Regex keyword (9 chủ đề)
+  - `feeds.config.ts`: 7 RSS feeds
+- **Endpoints**:
+  - `POST /ingestion/run` - Trigger ingest thủ công
+  - `POST /ingestion/backfill-clickbait` - Tính lại score cho articles cũ
+
+#### 7. Chat Module (Core Feature)
+- **Mục đích**: Xử lý chat hỏi-đáp real-time với streaming SSE
+- **Components**:
+  - `ChatService`:
+    - `stream()` - Observable SSE
+    - `rewriteFollowup()` - Viết lại câu hỏi tiếp nối (LLM nano tier)
+    - `listConversations()`, `getMessages()`, `setFeedback()`
+  - `ChatController`:
+- **Endpoints**:
+  - `GET /chat/stream?q=...&conversationId=...&topic=...` - SSE stream
+  - `GET /chat/conversations` - Danh sách conversations
+  - `GET /chat/conversations/:id/messages` - Messages của 1 conversation
+  - `POST /chat/messages/:id/feedback` - Ghi feedback
+
+#### 8. Articles Module (Article Management + AI Features)
+- **Mục đích**: Quản lý article CRUD + tất cả AI features
+- **Components**:
+  - `ArticlesService`:
+    - `search(q?, topic?, page?)` - Full-text search + topic filter
+    - `getById(id)` - Chi tiết article + clickbait flag
+    - `listTopics()` - Topics + article counts
+    - `clickbaitRanking(page)` - Xếp hạng clickbait (F2)
+    - `stats()` - Dashboard stats
+    - `related(id)` - Articles liên quan
+    - AI features: `getSummary()`, `suggestQuestions()`, `dailyBrief()`, `timeline()`, `compare()`, `insights()`
+  - `ArticlesController`
+  - `FeaturesController`
+- **Endpoints**:
+  - `GET /articles` - Search + pagination
+  - `GET /articles/topics` - Danh sách topics
+  - `GET /articles/stats` - Dashboard statistics
+  - `GET /articles/clickbait?page=` - Clickbait ranking
+  - `GET /articles/:id` - Chi tiết article
+  - `GET /articles/:id/related` - Articles liên quan
+  - `GET /articles/:id/summary` - AI summary (cached)
+  - `GET /articles/:id/questions` - AI suggested questions (E3)
+  - `GET /brief` - Daily brief (cached/ngày)
+  - `GET /timeline?q=` - Timeline + narrative
+  - `GET /compare?q=` - So sánh nguồn tin
+  - `GET /insights` - Thống kê: volume, sources, trending terms
+
+#### 9. Events Module (Event Clustering + Analysis)
+- **Mục đích**: Cluster articles thành sự kiện bằng cosine similarity
+- **Components**:
+  - `EventsService`:
+    - `cluster()` - Batch clustering (cosine >= 0.72, 0 LLM)
+    - `listEvents()` - Events đa nguồn
+    - `listDeveloping()` - Stories đang phát triển
+    - `listRising()` - Stories đang nóng lên (F5)
+    - `listBlindspots()` - Stories chỉ 1 nguồn
+    - `getEvent(id)` - Chi tiết event + AI analysis
+  - `rising.util.ts`: Tính velocity (F5)
+- **Endpoints**:
+  - `GET /events?from=` - Events đa nguồn
+  - `GET /events/developing` - Stories đang phát triển
+  - `GET /events/rising?window=` - Stories đang nóng lên
+  - `GET /events/blindspots` - Blind spots / scoops
+  - `POST /events/cluster` - Trigger clustering thủ công
+  - `GET /events/:id` - Chi tiết event
+
+#### 10. Factcheck Module
+- **Mục đích**: Kiểm chứng thông tin (corpus + web)
+- **Components**:
+  - `FactcheckService`:
+    - `check(claim)` - Retrieval k=12 → structured output
+    - `checkOnline(claim)` - Web-augmented check
+- **Endpoints**:
+  - `GET /factcheck?claim=` - Kiểm chứng trong corpus
+  - `GET /factcheck/online?claim=` - Kiểm chứng qua web
+
+#### 11. Entities Module
+- **Mục đích**: Trích xuất thực thể từ tiêu đề bài báo (heuristic)
+- **Components**:
+  - `EntitiesService`:
+    - `listEntities(limit?)` - Capitalized phrases >= 3 lần
+    - `getEntity(name)` - Dossier: mentions + recent articles
+- **Endpoints**:
+  - `GET /entities` - Danh sách entities
+  - `GET /entities/:name` - Dossier 1 entity
+
+#### 12. Sources Module
+- **Mục đích**: Phân tích hiệu suất từng nguồn tin
+- **Components**:
+  - `SourcesService`:
+    - `listSources()` - articleCount, firstCount, exclusiveCount
+    - `getSource(name)` - Profile: byTopic, stats, recent articles
+- **Endpoints**:
+  - `GET /sources` - Danh sách sources + analytics
+  - `GET /sources/:name` - Profile 1 source
+
+#### 13. Periods Module
+- **Mục đích**: Tổng kết tin theo quý/năm
+- **Components**:
+  - `PeriodsService`:
+    - `getActive()` - Quý hiện tại
+    - `listPeriods()` - Tất cả quý + live stats
+    - `getPeriod(id)` - Chi tiết quý + AI recap
+    - `rollover()` - Force archive + generate recaps
+    - `yearReview(year)` - Tổng kết năm
+- **Endpoints**:
+  - `GET /periods/active` - Quý hiện tại
+  - `GET /periods` - Tất cả các quý
+  - `POST /periods/rollover` - Trigger archive + recap
+  - `GET /periods/year/:year` - Tổng kết năm
+  - `GET /periods/:id` - Chi tiết quý
+
+#### 14. Usage Module
+- **Mục đích**: Ghi nhận chi phí/tokens LLM
+- **Components**:
+  - `UsageService`:
+    - `record(row)` - Fire-and-forget ghi vào `LlmUsage`
+    - `summary()` - Aggregation 30 ngày
+- **Endpoints**:
+  - `GET /usage` - Tổng quan usage
+
+#### 15. Health Module
+- **Mục đích**: Kiểm tra trạng thái hệ thống
+- **Components**:
+  - `HealthController`: Kiểm tra DB + Ollama 2 instances
+- **Endpoints**:
+  - `GET /health` - `{status: "ok"|"degraded", checks: {...}, uptimeSec}`
+
+### Sơ đồ Dependencies giữa các Module
+
+```
+                        ┌─────────────┐
+                        │    Prisma   │ (Global)
+                        │  Module     │
+                        └──────┬──────┘
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        │                      │                      │
+  ┌─────▼─────┐         ┌──────▼──────┐        ┌──────▼──────┐
+  │ Embedding  │         │   Usage     │        │  Ingestion  │
+  │  Module    │◄────────│   Module    │◄───────│   Module    │
+  │(bge-m3)   │         │             │        │(RSS/Queue)  │
+  └─────┬──────┘         └──────▲──────┘        └─────────────┘
+        │                       │
+        │                  ┌────┴────┐
+  ┌─────▼──────┐           │   LLM   │
+  │ Retrieval  │           │ Module  │
+  │  Module    │           │(OpenRtr)│
+  └─────┬──────┘           └────┬────┘
+        │                       │
+   ┌────┼────────┬──────────┬───┼──────────┬──────────┐
+   │    │        │          │   │          │          │
+ ┌─▼──┐│   ┌────▼───┐ ┌───▼──┐│    ┌─────▼──┐ ┌───▼────┐
+ │Chat││   │FactChk │ │Events││    │Periods │ │Articles│
+ │Mod ││   │ Module │ │Module││    │ Module │ │ Module │
+ └────┘│   └────────┘ └──────┘│    └────────┘ └────────┘
+```
+
+### Luồng Dữ Liệu Chính
+
+1. **Ingestion Pipeline**:
+   ```
+   RSS feeds → RssService → ContentExtractorService → ChunkService 
+   → EmbeddingService → classify topic → Save to PostgreSQL
+   ```
+
+2. **Chat Pipeline**:
+   ```
+   User question → ChatService.rewriteFollowup() (LLM nano) 
+   → RetrievalService.search() (hybrid) → LlmService.streamAnswer() 
+   → Save to DB → SSE stream to UI
+   ```
+
+3. **Fact-Check Pipeline**:
+   ```
+   Claim → RetrievalService.search() (k=12) 
+   → LlmService.generateStructured() OR generateWeb() 
+   → Verdict + Confidence + Analysis
+   ```
+
+4. **AI Features Pipeline**:
+   ```
+   Article data → LlmService.generate() (with prompt) 
+   → Cache result in DB
+   ```
 
 ---
 

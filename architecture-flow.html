@@ -41,7 +41,7 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
 .node.data rect{fill:var(--blue-soft);stroke:var(--blue)}
 .node.ext rect{stroke-dasharray:6 3}
 .node.star rect{fill:var(--gold-soft);stroke:var(--gold)}
-.edge{stroke:var(--muted);stroke-width:1.6;fill:none;marker-end:url(#am);transition:opacity .2s}
+.edge{stroke:var(--muted);stroke-width:1.8;fill:none;marker-end:url(#am);transition:opacity .2s}
 .edge.ws{stroke-width:2}
 .edge.dash{stroke-dasharray:5 4}
 .elbl{font-family:var(--mono);font-size:10.5px;fill:var(--muted);transition:opacity .2s}
@@ -104,8 +104,8 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
 <div class="stage" id="stage">
 <svg viewBox="0 0 1600 960" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Diem Tin AI architecture diagram">
   <defs>
-    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="var(--muted)"/></marker>
-    <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L10,5 L0,10" fill="var(--clay)"/></marker>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0,0 L10,5 L0,10" fill="var(--muted)"/></marker>
+    <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0,0 L10,5 L0,10" fill="var(--clay)"/></marker>
   </defs>
 
   <!-- ZONES -->
@@ -123,13 +123,13 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
   <path class="edge" id="e3i" d="M370,290 L370,330"/>
   <path class="edge" id="e4i" d="M370,410 L420,410 L550,410"/>
   <path class="edge" id="e5i" d="M550,410 L580,410"/>
-  <path class="edge" id="e6i" d="M370,410 L370,460 L1000,460 L1000,555 L900,555"/>
-  <path class="edge dash" id="e7i" d="M900,555 L900,410 L580,410"/>
+  <path class="edge" id="e6i" d="M370,410 L370,455 L915,455 L915,480"/>
+  <path class="edge dash" id="e7i" d="M915,535 L800,535 L800,410"/>
 
   <!-- EDGES: Q&A -->
   <path class="edge ws" id="e1q" d="M1475,200 L1370,200"/>
   <path class="edge" id="e2q" d="M1220,265 L1220,200 L1090,200"/>
-  <path class="edge" id="e3q" d="M1090,200 L1090,490 L895,490 L895,555 L900,555"/>
+  <path class="edge" id="e3q" d="M1090,200 L1050,200 L1050,480 L915,480"/>
   <path class="edge dash" id="e4q" d="M580,230 C 580,490 1090,490 1090,200"/>
   <path class="edge" id="e5q" d="M1090,200 L1045,110 L920,110 L920,190 L820,190"/>
   <path class="edge ws" id="e6q" d="M820,280 C 900,110 1120,110 1120,265 L1220,265"/>
@@ -138,7 +138,8 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
   <!-- EDGES: FACT-CHECK -->
   <path class="edge" id="e1f" d="M1220,410 L1220,200 L1090,200"/>
   <path class="edge ws" id="e2f" d="M820,280 L900,300 L1020,300 L1020,420 L1090,420"/>
-  <path class="edge" id="e3f" d="M1220,410 L1090,410"/>
+  <path class="edge" id="e0f" d="M1390,255 L1340,255 L1340,410 L1320,410"/>
+  <path class="edge" id="e3f" d="M1320,425 L1370,425 L1370,270 L1390,270"/>
 
   <!-- EDGES: AI FEATURES (summary, brief, timeline, compare, rewrite, event analysis, recap, year review, suggest questions) -->
   <path class="edge" id="e1fe" d="M580,340 C 700,340 1060,340 1060,340"/>
@@ -146,8 +147,8 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
   <path class="edge" id="e3fe" d="M580,440 C 700,440 1060,440 1060,440"/>
 
   <!-- EDGES: SQL ANALYTICS -->
-  <path class="edge" id="e1sq" d="M1475,450 L1340,450"/>
-  <path class="edge" id="e2sq" d="M1340,450 L1340,555 L900,555"/>
+  <path class="edge" id="e1sq" d="M1390,457 L1355,457 L1355,565 L1320,565"/>
+  <path class="edge" id="e2sq" d="M1080,545 L800,545 L800,410"/>
 
   <!-- EDGE LABELS -->
   <text class="elbl" data-e="e1i" x="248" y="174">7 RSS feeds → parser</text>
@@ -155,12 +156,12 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
   <text class="elbl" data-e="e3i" x="382" y="316">~400 tok chunks, 50 overlap</text>
   <text class="elbl" data-e="e4i" x="460" y="402">1024-dim vector chunks</text>
   <text class="elbl" data-e="e5i" x="558" y="400">pgvector HNSW upsert</text>
-  <text class="elbl" data-e="e6i" x="670" y="540">embed batch via Ollama ingest :11435</text>
-  <text class="elbl" data-e="e7i" x="740" y="422">write Article + Chunk rows</text>
+  <text class="elbl" data-e="e6i" x="600" y="448">embed batch via Ollama ingest :11435</text>
+  <text class="elbl" data-e="e7i" x="808" y="528">write Article + Chunk rows</text>
 
   <text class="elbl" data-e="e1q" x="1400" y="192">EventSource SSE</text>
   <text class="elbl" data-e="e2q" x="1140" y="235">ChatService.stream()</text>
-  <text class="elbl" data-e="e3q" x="980" y="538">embed() = Ollama chat :11434</text>
+  <text class="elbl" data-e="e3q" x="1058" y="340">embed() = Ollama chat :11434</text>
   <text class="elbl" data-e="e4q" x="845" y="365">hybrid search: vector + FTS + RRF</text>
   <text class="elbl" data-e="e5q" x="945" y="100">build context [1]…[5] + citations</text>
   <text class="elbl" data-e="e6q" x="1000" y="155">streamAnswer() = OpenRouter reasoning tier</text>
@@ -168,14 +169,15 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
 
   <text class="elbl" data-e="e1f" x="1170" y="295">retrieve 12 chunks</text>
   <text class="elbl" data-e="e2f" x="900" y="385">generateStructured() JSON Schema</text>
-  <text class="elbl" data-e="e3f" x="1160" y="400">verdict + confidence + analysis</text>
+  <text class="elbl" data-e="e3f" x="1310" y="418">verdict + confidence + analysis</text>
 
   <text class="elbl" data-e="e1fe" x="820" y="332">summary / brief / timeline</text>
   <text class="elbl" data-e="e2fe" x="820" y="382">compare / rewrite / event analysis</text>
   <text class="elbl" data-e="e3fe" x="820" y="432">recap / year review / suggest questions</text>
 
-  <text class="elbl" data-e="e1sq" x="1400" y="440">SQL queries</text>
-  <text class="elbl" data-e="e2sq" x="1140" y="540">usage by feature / model</text>
+  <text class="elbl" data-e="e0f" x="1348" y="335">input claim</text>
+  <text class="elbl" data-e="e1sq" x="1310" y="510">SQL queries</text>
+  <text class="elbl" data-e="e2sq" x="870" y="538">usage by feature / model</text>
 
   <!-- NODES: SOURCES -->
   <g class="node ext" data-k="vne"><rect x="50" y="155" width="170" height="43"/><text class="t" x="65" y="177">VnExpress</text><text class="m" x="65" y="192">RSS</text></g>
@@ -239,6 +241,7 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
   <!-- BADGES: FACT-CHECK -->
   <g class="badge" data-flow="fcheck"><circle cx="1475" cy="262" r="9"/><text x="1475" y="266" text-anchor="middle">1</text></g>
   <g class="badge" data-flow="fcheck"><circle cx="1220" cy="410" r="9"/><text x="1220" y="414" text-anchor="middle">2</text></g>
+  <g class="badge" data-flow="fcheck"><circle cx="1200" cy="200" r="9"/><text x="1200" y="204" text-anchor="middle">3</text></g>
 
   <!-- BADGES: AI FEATURES -->
   <g class="badge" data-flow="features"><circle cx="580" cy="340" r="9"/><text x="580" y="344" text-anchor="middle">1</text></g>
@@ -246,7 +249,7 @@ body{background:var(--bg);color:var(--body);font-family:var(--sans);-webkit-font
 
   <!-- BADGES: SQL ANALYTICS -->
   <g class="badge" data-flow="sql"><circle cx="1475" cy="457" r="9"/><text x="1475" y="461" text-anchor="middle">1</text></g>
-  <g class="badge" data-flow="sql"><circle cx="1340" cy="555" r="9"/><text x="1340" y="559" text-anchor="middle">2</text></g>
+  <g class="badge" data-flow="sql"><circle cx="1200" cy="565" r="9"/><text x="1200" y="569" text-anchor="middle">2</text></g>
 </svg>
 
   <div class="src">D:\Chatbot_QA · architecture-flow.html</div>
@@ -328,9 +331,9 @@ const FLOWS = {
   },
   fcheck: {
     name: "Fact-Check ⭐ — structured JSON",
-    edges: ["e1f","e2f","e3f"],
+    edges: ["e0f","e1f","e2f","e3f"],
     nodes: ["ffact","fcheck","retrieval","or","lc"],
-    steps: ["<b>Input claim</b> từ / Fact-Check UI → hybrid retrieval 12 chunks", "<b>generateStructured()</b> OpenRouter reasoning tier → JSON Schema forced", "<b>Return</b>: verdict (boolean) + confidence (0-1) + analysis (string). Fallback regex"]
+    steps: ["<b>Input claim</b> từ / Fact-Check UI → Fact-Check Module", "<b>Hybrid retrieval</b> 12 chunks từ pgvector", "<b>generateStructured()</b> OpenRouter reasoning tier → JSON Schema forced", "<b>Return</b>: verdict (boolean) + confidence (0-1) + analysis (string). Fallback regex"]
   },
   sql: {
     name: "SQL Analytics — FinOps + insights",
